@@ -6,30 +6,31 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -39,13 +40,18 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
-
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.modernqr.app.data.SettingsManager
 import com.modernqr.app.viewmodel.MainViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    val hapticEnabled by settingsManager.hapticFeedbackFlow.collectAsState(initial = true)
+    val soundEnabled by settingsManager.scanSoundFlow.collectAsState(initial = true)
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -57,9 +63,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            hasCameraPermission = granted
-        }
+        onResult = { granted -> hasCameraPermission = granted }
     )
 
     LaunchedEffect(key1 = true) {
@@ -73,6 +77,19 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
         var scannedResult by remember { mutableStateOf("") }
         var isTorchOn by remember { mutableStateOf(false) }
         var isFrontCamera by remember { mutableStateOf(false) }
+        var lastScanTime by remember { mutableStateOf(0L) }
+
+        // Animated scan line
+        val infiniteTransition = rememberInfiniteTransition(label = "scan_line")
+        val scanLineY by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "scan_line_y"
+        )
 
         val galleryLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent()
@@ -86,9 +103,12 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                     val source = RGBLuminanceSource(bitmap.width, bitmap.height, intArray)
                     val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
                     val result = MultiFormatReader().decode(binaryBitmap)
-                    if (result.text != scannedResult) {
+                    val now = System.currentTimeMillis()
+                    if (result.text != scannedResult || now - lastScanTime > 2000) {
                         scannedResult = result.text
+                        lastScanTime = now
                         viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
+                        if (hapticEnabled) triggerHaptic(context)
                     }
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, "Could not decode QR code from image", android.widget.Toast.LENGTH_SHORT).show()
@@ -110,20 +130,45 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                             settings.requestedCameraId = if (isFrontCamera) 1 else 0
                             this.cameraSettings = settings
                             this.decodeContinuous { result ->
-                                if (scannedResult != result.text) {
+                                val now = System.currentTimeMillis()
+                                if (result.text != scannedResult || now - lastScanTime > 2000) {
                                     scannedResult = result.text
+                                    lastScanTime = now
                                     viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
+                                    if (hapticEnabled) triggerHaptic(ctx)
                                 }
                             }
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                
+
+                // Animated scan line overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 48.dp, vertical = 80.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .align(Alignment.TopStart)
+                            .offset(y = (scanLineY * 300).dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                shape = RoundedCornerShape(1.dp)
+                            )
+                    )
+                }
+
                 // Controls Overlay
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).align(Alignment.TopCenter)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter)
                 ) {
                     ScannerActionButton(
                         icon = Icons.Default.Add,
@@ -131,9 +176,12 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                         onClick = { galleryLauncher.launch("image/*") }
                     )
                     ScannerActionButton(
-                        painter = androidx.compose.ui.res.painterResource(id = if (isTorchOn) com.ritikqrscanner.app.R.drawable.flashlight_on_24 else com.ritikqrscanner.app.R.drawable.flashlight_off_24),
+                        painter = androidx.compose.ui.res.painterResource(
+                            id = if (isTorchOn) com.ritikqrscanner.app.R.drawable.flashlight_on_24
+                            else com.ritikqrscanner.app.R.drawable.flashlight_off_24
+                        ),
                         label = "Torch",
-                        onClick = { 
+                        onClick = {
                             isTorchOn = !isTorchOn
                             if (isTorchOn) barcodeView?.setTorchOn() else barcodeView?.setTorchOff()
                         }
@@ -154,189 +202,239 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
             }
 
             if (scannedResult.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 250.dp)
-                        .padding(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Text("Scanned Content:", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(scannedResult)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-
-                            Button(
-                                onClick = {
-                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(scannedResult))
-                                    android.widget.Toast.makeText(context, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Copy")
-                            }
-
-                            Button(
-                                onClick = {
-                                    val sendIntent: Intent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, scannedResult)
-                                        type = "text/plain"
-                                    }
-                                    val shareIntent = Intent.createChooser(sendIntent, null)
-                                    context.startActivity(shareIntent)
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Share")
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Smart Actions
-                        if (android.util.Patterns.WEB_URL.matcher(scannedResult).matches()) {
-                            Button(
-                                onClick = { uriHandler.openUri(scannedResult) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Open URL")
-                            }
-                        } else if (scannedResult.startsWith("WIFI:")) {
-                            Button(
-                                onClick = {
-                                    val ssidMatch = Regex("S:([^;]+)").find(scannedResult)
-                                    val passMatch = Regex("P:([^;]+)").find(scannedResult)
-                                    val ssid = ssidMatch?.groupValues?.get(1) ?: ""
-                                    val pass = passMatch?.groupValues?.get(1) ?: ""
-                                    
-                                    if (ssid.isNotEmpty()) {
-                                        if (android.os.Build.VERSION.SDK_INT >= 30) {
-                                            val suggestion = android.net.wifi.WifiNetworkSuggestion.Builder()
-                                                .setSsid(ssid)
-                                                .setWpa2Passphrase(pass)
-                                                .build()
-                                            
-                                            val intent = Intent(Settings.ACTION_WIFI_ADD_NETWORKS).apply {
-                                                putParcelableArrayListExtra(Settings.EXTRA_WIFI_NETWORK_LIST, arrayListOf(suggestion))
-                                            }
-                                            context.startActivity(intent)
-                                        } else if (android.os.Build.VERSION.SDK_INT == 29) {
-                                            val specifier = android.net.wifi.WifiNetworkSpecifier.Builder()
-                                                .setSsid(ssid)
-                                                .setWpa2Passphrase(pass)
-                                                .build()
-
-                                            val request = android.net.NetworkRequest.Builder()
-                                                .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
-                                                .setNetworkSpecifier(specifier)
-                                                .build()
-
-                                            val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                                            connectivityManager.requestNetwork(request, object : android.net.ConnectivityManager.NetworkCallback() {})
-                                            android.widget.Toast.makeText(context, "Please approve the connection to $ssid", android.widget.Toast.LENGTH_LONG).show()
-                                        } else {
-                                            val wifiManager = context.applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                                            val conf = android.net.wifi.WifiConfiguration()
-                                            conf.SSID = "\"" + ssid + "\""
-                                            conf.preSharedKey = "\"" + pass + "\""
-                                            val netId = wifiManager.addNetwork(conf)
-                                            wifiManager.disconnect()
-                                            wifiManager.enableNetwork(netId, true)
-                                            wifiManager.reconnect()
-                                            android.widget.Toast.makeText(context, "Connecting to $ssid...", android.widget.Toast.LENGTH_SHORT).show()
-                                        }
-                                    } else {
-                                        context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
-                                        val clipboardManagerInstance = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        val clip = android.content.ClipData.newPlainText("password", pass)
-                                        clipboardManagerInstance.setPrimaryClip(clip)
-                                        android.widget.Toast.makeText(context, "Password copied. Please connect manually.", android.widget.Toast.LENGTH_LONG).show()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Connect to WiFi")
-                            }
-                        } else if (scannedResult.startsWith("MATMSG:") || scannedResult.startsWith("mailto:")) {
-                            val email = if (scannedResult.startsWith("mailto:")) {
-                                scannedResult.removePrefix("mailto:")
-                            } else {
-                                val match = Regex("TO:(.*?);").find(scannedResult)
-                                match?.groupValues?.get(1) ?: ""
-                            }
-                            Button(
-                                onClick = { 
-                                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                        data = Uri.parse("mailto:$email")
-                                    }
-                                    context.startActivity(intent)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Send Email to $email")
-                            }
-                        }
-                    }
-                }
+                ScannedResultCard(
+                    result = scannedResult,
+                    onDismiss = { scannedResult = "" }
+                )
             }
         }
 
         DisposableEffect(key1 = true) {
             barcodeView?.resume()
-            onDispose {
-                barcodeView?.pause()
-            }
+            onDispose { barcodeView?.pause() }
         }
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Camera permission is required to scan QR codes.")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("📷", style = MaterialTheme.typography.displayMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Camera Permission Required", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Camera access is needed to scan QR codes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text("Open Settings")
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun ScannedResultCard(result: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    val isUrl = android.util.Patterns.WEB_URL.matcher(result).matches()
+    val isWifi = result.startsWith("WIFI:")
+    val isEmail = result.startsWith("MATMSG:") || result.startsWith("mailto:")
+    val isPhone = result.startsWith("tel:")
+    val isSms = result.startsWith("smsto:")
+    val isVCard = result.startsWith("BEGIN:VCARD")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 280.dp)
+            .padding(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Scanned Result", style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(18.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(result, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Copy + Share row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(result))
+                        android.widget.Toast.makeText(context, "Copied!", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Copy") }
+
+                OutlinedButton(
+                    onClick = {
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, result)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Share") }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Smart action buttons
+            when {
+                isUrl -> Button(
+                    onClick = { uriHandler.openUri(result) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("🌐 Open in Browser") }
+
+                isPhone -> Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse(result))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("📞 Call ${result.removePrefix("tel:")}") }
+
+                isSms -> {
+                    val parts = result.removePrefix("smsto:").split(":")
+                    val phone = parts.getOrElse(0) { "" }
+                    val msg = parts.getOrElse(1) { "" }
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
+                                putExtra("sms_body", msg)
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("💬 Send SMS") }
+                }
+
+                isWifi -> Button(
+                    onClick = {
+                        val ssidMatch = Regex("S:([^;]+)").find(result)
+                        val passMatch = Regex("P:([^;]+)").find(result)
+                        val ssid = ssidMatch?.groupValues?.get(1) ?: ""
+                        val pass = passMatch?.groupValues?.get(1) ?: ""
+                        if (ssid.isNotEmpty()) {
+                            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                                val suggestion = android.net.wifi.WifiNetworkSuggestion.Builder()
+                                    .setSsid(ssid).setWpa2Passphrase(pass).build()
+                                val intent = Intent(Settings.ACTION_WIFI_ADD_NETWORKS).apply {
+                                    putParcelableArrayListExtra(Settings.EXTRA_WIFI_NETWORK_LIST, arrayListOf(suggestion))
+                                }
+                                context.startActivity(intent)
+                            } else {
+                                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("📶 Connect to WiFi") }
+
+                isEmail -> {
+                    val email = if (result.startsWith("mailto:"))
+                        result.removePrefix("mailto:").substringBefore("?")
+                    else
+                        Regex("TO:(.*?);").find(result)?.groupValues?.get(1) ?: ""
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:$email")
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("✉️ Send Email to $email") }
+                }
+
+                isVCard -> Button(
+                    onClick = {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, result)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Add Contact"))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("👤 Add to Contacts") }
+            }
+        }
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun triggerHaptic(context: android.content.Context) {
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as Vibrator
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                vibrator.vibrate(60)
+            }
+        }
+    } catch (_: Exception) {}
 }
 
 @Composable
 fun ScannerActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }.padding(8.dp)
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(8.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(60.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                .size(56.dp)
+                .background(
+                    color = Color.Black.copy(alpha = 0.45f),
                     shape = CircleShape
                 )
+                .border(width = 1.dp, color = Color.White.copy(alpha = 0.5f), shape = CircleShape)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Text(text = label, style = MaterialTheme.typography.bodySmall, color = Color.White)
     }
 }
 
@@ -344,30 +442,28 @@ fun ScannerActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 fun ScannerActionButton(painter: androidx.compose.ui.graphics.painter.Painter, label: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }.padding(8.dp)
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(8.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(60.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                .size(56.dp)
+                .background(
+                    color = Color.Black.copy(alpha = 0.45f),
                     shape = CircleShape
                 )
+                .border(width = 1.dp, color = Color.White.copy(alpha = 0.5f), shape = CircleShape)
         ) {
             Icon(
                 painter = painter,
                 contentDescription = label,
-                tint = MaterialTheme.colorScheme.onSurface,
+                tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Text(text = label, style = MaterialTheme.typography.bodySmall, color = Color.White)
     }
 }

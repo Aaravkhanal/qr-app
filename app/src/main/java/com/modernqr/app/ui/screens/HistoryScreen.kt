@@ -1,52 +1,106 @@
 package com.modernqr.app.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.modernqr.app.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
     val historyItems by viewModel.history.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val filterType by viewModel.filterType.collectAsState()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    val filterOptions = listOf("All", "Scanned", "Generated", "Pinned")
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Header
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 2.dp
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "History",
-                    style = MaterialTheme.typography.headlineMedium
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "History",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (historyItems.isNotEmpty() || searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { showClearHistoryDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear History")
+                        }
+                    }
+                }
+
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    placeholder = { Text("Search history...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        AnimatedVisibility(visible = searchQuery.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
-                if (historyItems.isNotEmpty()) {
-                    IconButton(onClick = { showClearHistoryDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear History")
+
+                // Filter Chips
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filterOptions) { option ->
+                        FilterChip(
+                            selected = filterType == option,
+                            onClick = { viewModel.setFilterType(option) },
+                            label = { Text(option) }
+                        )
                     }
                 }
             }
@@ -57,64 +111,36 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "No history yet.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (searchQuery.isNotEmpty()) "🔍" else "📋",
+                        style = MaterialTheme.typography.displayMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (searchQuery.isNotEmpty()) "No results found" else "No history yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = if (searchQuery.isNotEmpty()) "Try a different search term" else "Scan or generate a QR code to get started",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
             }
         } else {
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(historyItems, key = { it.id }) { item ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = item.content,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = item.type,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = formatTimestamp(item.timestamp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Row {
-                                    IconButton(onClick = { viewModel.updateHistoryItem(item.copy(isPinned = !item.isPinned)) }) {
-                                        Icon(
-                                            if (item.isPinned) Icons.Filled.Star else Icons.Outlined.Star, 
-                                            contentDescription = if (item.isPinned) "Unpin" else "Pin",
-                                            tint = if (item.isPinned) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                        )
-                                    }
-                                    IconButton(onClick = { viewModel.deleteHistoryItem(item) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    HistoryItemCard(
+                        item = item,
+                        onPin = { viewModel.updateHistoryItem(item.copy(isPinned = !item.isPinned)) },
+                        onDelete = { viewModel.deleteHistoryItem(item) }
+                    )
                 }
             }
         }
@@ -129,20 +155,216 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
                 TextButton(onClick = {
                     viewModel.clearHistory()
                     showClearHistoryDialog = false
-                }) {
-                    Text("Clear")
-                }
+                }) { Text("Clear", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearHistoryDialog = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showClearHistoryDialog = false }) { Text("Cancel") }
             }
         )
     }
 }
 
+@Composable
+private fun HistoryItemCard(
+    item: com.modernqr.app.data.HistoryItem,
+    onPin: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    var showToast by remember { mutableStateOf(false) }
+
+    if (showToast) {
+        LaunchedEffect(Unit) {
+            android.widget.Toast.makeText(context, "Copied!", android.widget.Toast.LENGTH_SHORT).show()
+            showToast = false
+        }
+    }
+
+    val isUrl = android.util.Patterns.WEB_URL.matcher(item.content).matches()
+    val isPhone = item.content.startsWith("tel:")
+    val isSms = item.content.startsWith("smsto:")
+    val isEmail = item.content.startsWith("mailto:") || item.content.startsWith("MATMSG:")
+    val isVCard = item.content.startsWith("BEGIN:VCARD")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                clipboardManager.setText(AnnotatedString(item.content))
+                showToast = true
+            },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.isPinned)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Type badge + timestamp row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SuggestionChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                text = item.type,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = if (item.type == "Scanned")
+                                MaterialTheme.colorScheme.secondaryContainer
+                            else
+                                MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    )
+                    SuggestionChip(
+                        onClick = {},
+                        label = {
+                            Text(
+                                text = item.format,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    )
+                }
+                Text(
+                    text = formatTimestamp(item.timestamp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Content
+            Text(
+                text = item.content,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Action row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Smart action buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    when {
+                        isUrl -> {
+                            OutlinedButton(
+                                onClick = { uriHandler.openUri(item.content) },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Open URL", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        isPhone -> {
+                            val number = item.content.removePrefix("tel:")
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse(item.content))
+                                    context.startActivity(intent)
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Call $number", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        isSms -> {
+                            OutlinedButton(
+                                onClick = {
+                                    val parts = item.content.removePrefix("smsto:").split(":")
+                                    val phone = parts.getOrElse(0) { "" }
+                                    val msg = parts.getOrElse(1) { "" }
+                                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
+                                        putExtra("sms_body", msg)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Send SMS", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        isEmail -> {
+                            val email = if (item.content.startsWith("mailto:"))
+                                item.content.removePrefix("mailto:").substringBefore("?")
+                            else
+                                Regex("TO:(.*?);").find(item.content)?.groupValues?.get(1) ?: ""
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                        data = Uri.parse("mailto:$email")
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Email", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        isVCard -> {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        type = "text/vcard"
+                                        // Pass vCard as data via share
+                                    }
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, item.content)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Add Contact"))
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Add Contact", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        else -> {
+                            Text(
+                                "Tap to copy",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+
+                Row {
+                    IconButton(onClick = onPin, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            if (item.isPinned) Icons.Filled.Star else Icons.Outlined.Star,
+                            contentDescription = if (item.isPinned) "Unpin" else "Pin",
+                            tint = if (item.isPinned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun formatTimestamp(timestamp: Long): String {
-    val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
 }
