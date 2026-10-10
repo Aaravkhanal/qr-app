@@ -84,6 +84,12 @@ keyPassword=your-key-password
 
 The keystore and `keystore.properties` are ignored by Git. Keep both files outside version control and provide them to CI through encrypted secrets when publishing.
 
+### Scan Feedback Policy
+
+Scan sound and vibration are each controlled by their setting. Sound uses the notification audio
+stream and only plays while the device ringer is in normal mode; silent and vibrate modes are never
+overridden. The audio resource is released when the scanner leaves the screen.
+
 ## 🐛 Bug Fixes & Improvements
 - **Wi-Fi Connection Stability**: Fixed issues with legacy parsing and improved connection handling for both Android 10+ (using `WifiNetworkSuggestion`/`WifiNetworkSpecifier`) and older devices (using legacy `WifiManager`).
 - **Dark Mode Theming**: Resolved hardcoded colors that broke UI visibility in dark mode. Complete migration to Material Theme ColorSchemes.

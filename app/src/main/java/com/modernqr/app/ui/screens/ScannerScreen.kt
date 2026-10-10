@@ -1,15 +1,14 @@
 package com.modernqr.app.ui.screens
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.hardware.Camera
 import android.net.Uri
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -27,63 +26,176 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.journeyapps.barcodescanner.CameraPreview
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.camera.CameraSettings
-import com.google.zxing.BinaryBitmap
-import com.google.zxing.MultiFormatReader
-import com.google.zxing.RGBLuminanceSource
-import com.google.zxing.common.HybridBinarizer
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.modernqr.app.data.SettingsManager
 import com.modernqr.app.domain.qr.QrAction
 import com.modernqr.app.domain.qr.QrActionResolver
 import com.modernqr.app.domain.qr.QrPayloadParser
+import com.modernqr.app.scanner.GalleryDecodeException
+import com.modernqr.app.scanner.ScanFeedback
+import com.modernqr.app.scanner.ScanSessionGate
+import com.modernqr.app.scanner.decodeGalleryBarcode
 import com.modernqr.app.ui.label
 import com.modernqr.app.ui.launchQrAction
 import com.modernqr.app.viewmodel.MainViewModel
-import kotlinx.coroutines.delay
+import com.ritikqrscanner.app.BuildConfig
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
     val hapticEnabled by settingsManager.hapticFeedbackFlow.collectAsState(initial = true)
     val soundEnabled by settingsManager.scanSoundFlow.collectAsState(initial = true)
+    val currentHapticEnabled by rememberUpdatedState(hapticEnabled)
+    val currentSoundEnabled by rememberUpdatedState(soundEnabled)
+    val feedback = remember { ScanFeedback(context) }
+    val availableCameras = remember { discoverCameras() }
 
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                android.Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-        )
+    var hasCameraPermission by remember { mutableStateOf(context.hasCameraPermission()) }
+    var permissionRequested by rememberSaveable { mutableStateOf(false) }
+    var permissionPermanentlyDenied by rememberSaveable { mutableStateOf(false) }
+    var scannedResult by rememberSaveable { mutableStateOf<String?>(null) }
+    var scannedFormat by rememberSaveable { mutableStateOf("QR_CODE") }
+    val sessionGate = remember { ScanSessionGate(initiallyLocked = scannedResult != null) }
+    var barcodeView by remember { mutableStateOf<DecoratedBarcodeView?>(null) }
+    var lifecycleResumed by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
+    var selectedCameraId by rememberSaveable {
+        mutableIntStateOf(availableCameras.firstOrNull { !it.isFrontFacing }?.id ?: availableCameras.firstOrNull()?.id ?: -1)
+    }
+    var isTorchOn by rememberSaveable { mutableStateOf(false) }
+    var cameraRetryKey by remember { mutableIntStateOf(0) }
+    var cameraError by rememberSaveable {
+        mutableStateOf(if (availableCameras.isEmpty()) "No compatible camera was found on this device." else null)
+    }
+    var galleryError by rememberSaveable { mutableStateOf<String?>(null) }
+    var isGalleryDecoding by remember { mutableStateOf(false) }
 
-    val launcher = rememberLauncherForActivityResult(
+    val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted -> hasCameraPermission = granted }
+        onResult = { granted ->
+            hasCameraPermission = granted
+            permissionPermanentlyDenied = !granted && activity?.let {
+                !ActivityCompat.shouldShowRequestPermissionRationale(it, android.Manifest.permission.CAMERA)
+            } == true
+        }
     )
 
-    LaunchedEffect(key1 = true) {
-        if (!hasCameraPermission) {
-            launcher.launch(android.Manifest.permission.CAMERA)
+    fun requestCameraPermission() {
+        permissionRequested = true
+        permissionLauncher.launch(android.Manifest.permission.CAMERA)
+    }
+
+    fun acceptResult(value: String, format: String) {
+        if (!sessionGate.tryAccept()) return
+        barcodeView?.pause()
+        scannedResult = value
+        scannedFormat = format
+        galleryError = null
+        viewModel.addHistoryItem(value, format, "Scanned")
+        feedback.confirm(currentSoundEnabled, currentHapticEnabled)
+    }
+
+    fun armCamera() {
+        val view = barcodeView ?: return
+        if (!hasCameraPermission || !lifecycleResumed || scannedResult != null || isGalleryDecoding || selectedCameraId < 0) return
+        try {
+            view.pause()
+            view.cameraSettings = CameraSettings().apply { requestedCameraId = selectedCameraId }
+            view.resume()
+            view.decodeSingle { result -> acceptResult(result.text, result.barcodeFormat.name) }
+        } catch (error: RuntimeException) {
+            logScannerFailure("Unable to start camera", error)
+            cameraError = "The camera could not be started. Close other camera apps and try again."
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) {
+            isGalleryDecoding = false
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            try {
+                val result = decodeGalleryBarcode(context, uri)
+                acceptResult(result.text, result.barcodeFormat.name)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: GalleryDecodeException) {
+                galleryError = error.message
+            } catch (error: Exception) {
+                logScannerFailure("Unable to decode gallery image", error)
+                galleryError = "The selected image could not be scanned."
+            } finally {
+                isGalleryDecoding = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission && !permissionRequested) requestCameraPermission()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    lifecycleResumed = true
+                    hasCameraPermission = context.hasCameraPermission()
+                    if (hasCameraPermission) permissionPermanentlyDenied = false
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    lifecycleResumed = false
+                    barcodeView?.pause()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(
+        barcodeView,
+        hasCameraPermission,
+        lifecycleResumed,
+        scannedResult,
+        isGalleryDecoding,
+        selectedCameraId,
+        cameraRetryKey
+    ) {
+        if (scannedResult == null && !isGalleryDecoding) armCamera() else barcodeView?.pause()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            barcodeView?.pause()
+            feedback.close()
         }
     }
 
     if (hasCameraPermission) {
-        var barcodeView: DecoratedBarcodeView? by remember { mutableStateOf(null) }
-        var scannedResult by remember { mutableStateOf("") }
-        var scannedFormat by remember { mutableStateOf("QR_CODE") }
-        var isTorchOn by remember { mutableStateOf(false) }
-        var isFrontCamera by remember { mutableStateOf(false) }
-        var lastScanTime by remember { mutableStateOf(0L) }
 
         // Animated scan line
         val infiniteTransition = rememberInfiniteTransition(label = "scan_line")
@@ -97,59 +209,44 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
             label = "scan_line_y"
         )
 
-        val galleryLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
-            uri?.let {
-                try {
-                    val inputStream = context.contentResolver.openInputStream(it)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    val intArray = IntArray(bitmap.width * bitmap.height)
-                    bitmap.getPixels(intArray, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                    val source = RGBLuminanceSource(bitmap.width, bitmap.height, intArray)
-                    val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
-                    val result = MultiFormatReader().decode(binaryBitmap)
-                    val now = System.currentTimeMillis()
-                    if (result.text != scannedResult || now - lastScanTime > 2000) {
-                        scannedResult = result.text
-                        scannedFormat = result.barcodeFormat.name
-                        lastScanTime = now
-                        viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
-                        if (hapticEnabled) triggerHaptic(context)
-                    }
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Could not decode QR code from image", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                AndroidView(
-                    factory = { ctx ->
-                        DecoratedBarcodeView(ctx).apply {
-                            barcodeView = this
-                            val settings = CameraSettings()
-                            settings.requestedCameraId = if (isFrontCamera) 1 else 0
-                            this.cameraSettings = settings
-                            this.decodeContinuous { result ->
-                                val now = System.currentTimeMillis()
-                                if (result.text != scannedResult || now - lastScanTime > 2000) {
-                                    scannedResult = result.text
-                                    scannedFormat = result.barcodeFormat.name
-                                    lastScanTime = now
-                                    viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
-                                    if (hapticEnabled) triggerHaptic(ctx)
-                                }
+                if (availableCameras.isNotEmpty()) {
+                    AndroidView(
+                        factory = { ctx ->
+                            DecoratedBarcodeView(ctx).apply {
+                                cameraSettings = CameraSettings().apply { requestedCameraId = selectedCameraId }
+                                getBarcodeView().addStateListener(object : CameraPreview.StateListener {
+                                    override fun previewSized() = Unit
+                                    override fun previewStarted() {
+                                        post {
+                                            cameraError = null
+                                            if (isTorchOn) runCatching { setTorchOn() }
+                                                .onFailure { logScannerFailure("Unable to restore torch", it) }
+                                        }
+                                    }
+                                    override fun previewStopped() = Unit
+                                    override fun cameraError(error: Exception) {
+                                        post {
+                                            logScannerFailure("Camera preview failed", error)
+                                            cameraError = "The camera stopped unexpectedly. You can try starting it again."
+                                        }
+                                    }
+                                    override fun cameraClosed() = Unit
+                                })
+                                barcodeView = this
                             }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+                        },
+                        update = { barcodeView = it },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(Color.Black))
+                }
 
                 // Animated scan line overlay
                 Box(
@@ -180,8 +277,14 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                 ) {
                     ScannerActionButton(
                         icon = Icons.Default.Add,
-                        label = "Gallery",
-                        onClick = { galleryLauncher.launch("image/*") }
+                        label = if (isGalleryDecoding) "Scanning…" else "Gallery",
+                        enabled = scannedResult == null && !isGalleryDecoding,
+                        onClick = {
+                            galleryError = null
+                            isGalleryDecoding = true
+                            barcodeView?.pause()
+                            galleryLauncher.launch("image/*")
+                        }
                     )
                     ScannerActionButton(
                         painter = androidx.compose.ui.res.painterResource(
@@ -189,60 +292,105 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                             else com.ritikqrscanner.app.R.drawable.flashlight_off_24
                         ),
                         label = "Torch",
+                        enabled = scannedResult == null && !isGalleryDecoding && availableCameras.isNotEmpty(),
                         onClick = {
-                            isTorchOn = !isTorchOn
-                            if (isTorchOn) barcodeView?.setTorchOn() else barcodeView?.setTorchOff()
+                            try {
+                                isTorchOn = !isTorchOn
+                                if (isTorchOn) barcodeView?.setTorchOn() else barcodeView?.setTorchOff()
+                            } catch (error: RuntimeException) {
+                                isTorchOn = false
+                                logScannerFailure("Unable to change torch", error)
+                                cameraError = "The flashlight is not available for this camera."
+                            }
                         }
                     )
-                    ScannerActionButton(
-                        icon = Icons.Default.Refresh,
-                        label = "Switch",
-                        onClick = {
-                            isFrontCamera = !isFrontCamera
-                            barcodeView?.pause()
-                            val settings = CameraSettings()
-                            settings.requestedCameraId = if (isFrontCamera) 1 else 0
-                            barcodeView?.cameraSettings = settings
-                            barcodeView?.resume()
+                    if (availableCameras.size > 1) {
+                        ScannerActionButton(
+                            icon = Icons.Default.Refresh,
+                            label = "Switch",
+                            enabled = scannedResult == null && !isGalleryDecoding,
+                            onClick = {
+                                barcodeView?.pause()
+                                isTorchOn = false
+                                val currentIndex = availableCameras.indexOfFirst { it.id == selectedCameraId }
+                                selectedCameraId = availableCameras[(currentIndex + 1).mod(availableCameras.size)].id
+                                cameraError = null
+                            }
+                        )
+                    }
+                }
+
+                if (isGalleryDecoding) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+
+                (cameraError ?: galleryError)?.let { message ->
+                    Card(
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                    ) {
+                        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(message, color = MaterialTheme.colorScheme.onErrorContainer)
+                            if (cameraError != null && availableCameras.isNotEmpty()) {
+                                TextButton(onClick = {
+                                    cameraError = null
+                                    cameraRetryKey++
+                                }) { Text("Try camera again") }
+                            }
                         }
-                    )
+                    }
                 }
             }
 
-            if (scannedResult.isNotEmpty()) {
+            scannedResult?.let { result ->
                 ScannedResultCard(
-                    result = scannedResult,
+                    result = result,
                     barcodeFormat = scannedFormat,
-                    onDismiss = { scannedResult = "" }
+                    onDismiss = {
+                        sessionGate.dismiss()
+                        scannedResult = null
+                        cameraError = null
+                    }
                 )
             }
-        }
-
-        DisposableEffect(key1 = true) {
-            barcodeView?.resume()
-            onDispose { barcodeView?.pause() }
         }
     } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("📷", style = MaterialTheme.typography.displayMedium)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Camera Permission Required", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Camera access is needed to scan QR codes.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", context.packageName, null)
-                    }
-                    context.startActivity(intent)
-                }) {
-                    Text("Open Settings")
-                }
+        CameraPermissionContent(
+            permanentlyDenied = permissionPermanentlyDenied,
+            onTryAgain = ::requestCameraPermission,
+            onOpenSettings = { context.openAppSettings() }
+        )
+    }
+}
+
+@Composable
+private fun CameraPermissionContent(
+    permanentlyDenied: Boolean,
+    onTryAgain: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("📷", style = MaterialTheme.typography.displayMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Camera Permission Required", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                if (permanentlyDenied) {
+                    "Camera access has been permanently denied. Enable it in system settings to scan with the camera."
+                } else {
+                    "Camera access is needed to scan QR codes and barcodes."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onTryAgain) { Text("Try again") }
+                Button(onClick = onOpenSettings) { Text("Open Settings") }
             }
         }
     }
@@ -321,29 +469,18 @@ private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: 
     }
 }
 
-@Suppress("DEPRECATION")
-private fun triggerHaptic(context: android.content.Context) {
-    try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as Vibrator
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(60, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                vibrator.vibrate(60)
-            }
-        }
-    } catch (_: Exception) {}
-}
-
 @Composable
-fun ScannerActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+fun ScannerActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
+            .then(if (enabled) Modifier else Modifier.background(Color.Black.copy(alpha = 0.25f)))
             .padding(8.dp)
     ) {
         Box(
@@ -369,11 +506,17 @@ fun ScannerActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 }
 
 @Composable
-fun ScannerActionButton(painter: androidx.compose.ui.graphics.painter.Painter, label: String, onClick: () -> Unit) {
+fun ScannerActionButton(
+    painter: androidx.compose.ui.graphics.painter.Painter,
+    label: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
+            .then(if (enabled) Modifier else Modifier.background(Color.Black.copy(alpha = 0.25f)))
             .padding(8.dp)
     ) {
         Box(
@@ -396,4 +539,42 @@ fun ScannerActionButton(painter: androidx.compose.ui.graphics.painter.Painter, l
         Spacer(modifier = Modifier.height(4.dp))
         Text(text = label, style = MaterialTheme.typography.bodySmall, color = Color.White)
     }
+}
+
+private data class CameraOption(val id: Int, val isFrontFacing: Boolean)
+
+@Suppress("DEPRECATION")
+private fun discoverCameras(): List<CameraOption> = try {
+    (0 until Camera.getNumberOfCameras()).mapNotNull { cameraId ->
+        try {
+            val info = Camera.CameraInfo()
+            Camera.getCameraInfo(cameraId, info)
+            CameraOption(cameraId, info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT)
+        } catch (error: RuntimeException) {
+            logScannerFailure("Unable to inspect camera $cameraId", error)
+            null
+        }
+    }
+} catch (error: RuntimeException) {
+    logScannerFailure("Unable to discover cameras", error)
+    emptyList()
+}
+
+private fun Context.hasCameraPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+private fun Context.openAppSettings() {
+    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", packageName, null)
+    })
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun logScannerFailure(message: String, error: Throwable) {
+    if (BuildConfig.DEBUG) Log.w("ScannerScreen", message, error)
 }
