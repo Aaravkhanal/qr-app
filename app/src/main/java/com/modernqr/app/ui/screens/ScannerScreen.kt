@@ -42,6 +42,11 @@ import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.modernqr.app.data.SettingsManager
+import com.modernqr.app.domain.qr.QrAction
+import com.modernqr.app.domain.qr.QrActionResolver
+import com.modernqr.app.domain.qr.QrPayloadParser
+import com.modernqr.app.ui.label
+import com.modernqr.app.ui.launchQrAction
 import com.modernqr.app.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 
@@ -75,6 +80,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
     if (hasCameraPermission) {
         var barcodeView: DecoratedBarcodeView? by remember { mutableStateOf(null) }
         var scannedResult by remember { mutableStateOf("") }
+        var scannedFormat by remember { mutableStateOf("QR_CODE") }
         var isTorchOn by remember { mutableStateOf(false) }
         var isFrontCamera by remember { mutableStateOf(false) }
         var lastScanTime by remember { mutableStateOf(0L) }
@@ -106,6 +112,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                     val now = System.currentTimeMillis()
                     if (result.text != scannedResult || now - lastScanTime > 2000) {
                         scannedResult = result.text
+                        scannedFormat = result.barcodeFormat.name
                         lastScanTime = now
                         viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
                         if (hapticEnabled) triggerHaptic(context)
@@ -133,6 +140,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                                 val now = System.currentTimeMillis()
                                 if (result.text != scannedResult || now - lastScanTime > 2000) {
                                     scannedResult = result.text
+                                    scannedFormat = result.barcodeFormat.name
                                     lastScanTime = now
                                     viewModel.addHistoryItem(result.text, result.barcodeFormat.name, "Scanned")
                                     if (hapticEnabled) triggerHaptic(ctx)
@@ -204,6 +212,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
             if (scannedResult.isNotEmpty()) {
                 ScannedResultCard(
                     result = scannedResult,
+                    barcodeFormat = scannedFormat,
                     onDismiss = { scannedResult = "" }
                 )
             }
@@ -240,17 +249,11 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
-private fun ScannedResultCard(result: String, onDismiss: () -> Unit) {
+private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-
-    val isUrl = android.util.Patterns.WEB_URL.matcher(result).matches()
-    val isWifi = result.startsWith("WIFI:")
-    val isEmail = result.startsWith("MATMSG:") || result.startsWith("mailto:")
-    val isPhone = result.startsWith("tel:")
-    val isSms = result.startsWith("smsto:")
-    val isVCard = result.startsWith("BEGIN:VCARD")
+    val payload = remember(result, barcodeFormat) { QrPayloadParser.parse(result, barcodeFormat) }
+    val action = remember(payload) { QrActionResolver.resolve(payload) }
 
     Card(
         modifier = Modifier
@@ -308,84 +311,11 @@ private fun ScannedResultCard(result: String, onDismiss: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Smart action buttons
-            when {
-                isUrl -> Button(
-                    onClick = { uriHandler.openUri(result) },
+            if (action != QrAction.None) {
+                Button(
+                    onClick = { launchQrAction(context, action) },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("🌐 Open in Browser") }
-
-                isPhone -> Button(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse(result))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("📞 Call ${result.removePrefix("tel:")}") }
-
-                isSms -> {
-                    val parts = result.removePrefix("smsto:").split(":")
-                    val phone = parts.getOrElse(0) { "" }
-                    val msg = parts.getOrElse(1) { "" }
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
-                                putExtra("sms_body", msg)
-                            }
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("💬 Send SMS") }
-                }
-
-                isWifi -> Button(
-                    onClick = {
-                        val ssidMatch = Regex("S:([^;]+)").find(result)
-                        val passMatch = Regex("P:([^;]+)").find(result)
-                        val ssid = ssidMatch?.groupValues?.get(1) ?: ""
-                        val pass = passMatch?.groupValues?.get(1) ?: ""
-                        if (ssid.isNotEmpty()) {
-                            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                                val suggestion = android.net.wifi.WifiNetworkSuggestion.Builder()
-                                    .setSsid(ssid).setWpa2Passphrase(pass).build()
-                                val intent = Intent(Settings.ACTION_WIFI_ADD_NETWORKS).apply {
-                                    putParcelableArrayListExtra(Settings.EXTRA_WIFI_NETWORK_LIST, arrayListOf(suggestion))
-                                }
-                                context.startActivity(intent)
-                            } else {
-                                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("📶 Connect to WiFi") }
-
-                isEmail -> {
-                    val email = if (result.startsWith("mailto:"))
-                        result.removePrefix("mailto:").substringBefore("?")
-                    else
-                        Regex("TO:(.*?);").find(result)?.groupValues?.get(1) ?: ""
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:$email")
-                            }
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("✉️ Send Email to $email") }
-                }
-
-                isVCard -> Button(
-                    onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, result)
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Add Contact"))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("👤 Add to Contacts") }
+                ) { Text(action.label()) }
             }
         }
     }

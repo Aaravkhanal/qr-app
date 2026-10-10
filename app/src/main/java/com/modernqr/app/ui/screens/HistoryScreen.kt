@@ -1,7 +1,5 @@
 package com.modernqr.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,12 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.modernqr.app.domain.qr.QrAction
+import com.modernqr.app.domain.qr.QrActionResolver
+import com.modernqr.app.domain.qr.QrPayloadParser
+import com.modernqr.app.domain.qr.QrPayloadType
+import com.modernqr.app.ui.label
+import com.modernqr.app.ui.launchQrAction
 import com.modernqr.app.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -172,7 +175,6 @@ private fun HistoryItemCard(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
     var showToast by remember { mutableStateOf(false) }
 
     if (showToast) {
@@ -182,11 +184,10 @@ private fun HistoryItemCard(
         }
     }
 
-    val isUrl = android.util.Patterns.WEB_URL.matcher(item.content).matches()
-    val isPhone = item.content.startsWith("tel:")
-    val isSms = item.content.startsWith("smsto:")
-    val isEmail = item.content.startsWith("mailto:") || item.content.startsWith("MATMSG:")
-    val isVCard = item.content.startsWith("BEGIN:VCARD")
+    val payload = remember(item.content, item.format) {
+        QrPayloadParser.parse(item.content, item.format)
+    }
+    val action = remember(payload) { QrActionResolver.resolve(payload) }
 
     Card(
         modifier = Modifier
@@ -231,7 +232,11 @@ private fun HistoryItemCard(
                         onClick = {},
                         label = {
                             Text(
-                                text = item.format,
+                                text = if (payload.type == QrPayloadType.UNKNOWN) {
+                                    "${payload.type.displayName} (${item.format})"
+                                } else {
+                                    payload.type.displayName
+                                },
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -264,80 +269,18 @@ private fun HistoryItemCard(
             ) {
                 // Smart action buttons
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    when {
-                        isUrl -> {
-                            OutlinedButton(
-                                onClick = { uriHandler.openUri(item.content) },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Open URL", style = MaterialTheme.typography.labelSmall) }
-                        }
-                        isPhone -> {
-                            val number = item.content.removePrefix("tel:")
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse(item.content))
-                                    context.startActivity(intent)
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Call $number", style = MaterialTheme.typography.labelSmall) }
-                        }
-                        isSms -> {
-                            OutlinedButton(
-                                onClick = {
-                                    val parts = item.content.removePrefix("smsto:").split(":")
-                                    val phone = parts.getOrElse(0) { "" }
-                                    val msg = parts.getOrElse(1) { "" }
-                                    val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$phone")).apply {
-                                        putExtra("sms_body", msg)
-                                    }
-                                    context.startActivity(intent)
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Send SMS", style = MaterialTheme.typography.labelSmall) }
-                        }
-                        isEmail -> {
-                            val email = if (item.content.startsWith("mailto:"))
-                                item.content.removePrefix("mailto:").substringBefore("?")
-                            else
-                                Regex("TO:(.*?);").find(item.content)?.groupValues?.get(1) ?: ""
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                        data = Uri.parse("mailto:$email")
-                                    }
-                                    context.startActivity(intent)
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Email", style = MaterialTheme.typography.labelSmall) }
-                        }
-                        isVCard -> {
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        type = "text/vcard"
-                                        // Pass vCard as data via share
-                                    }
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, item.content)
-                                    }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Add Contact"))
-                                },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Add Contact", style = MaterialTheme.typography.labelSmall) }
-                        }
-                        else -> {
-                            Text(
-                                "Tap to copy",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
+                    if (action != QrAction.None) {
+                        OutlinedButton(
+                            onClick = { launchQrAction(context, action) },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) { Text(action.label(), style = MaterialTheme.typography.labelSmall) }
+                    } else {
+                        Text(
+                            "Tap to copy",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
                     }
                 }
 

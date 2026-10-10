@@ -33,29 +33,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.journeyapps.barcodescanner.BarcodeEncoder
+import com.modernqr.app.domain.qr.QrPayload
+import com.modernqr.app.domain.qr.QrPayloadEncoder
+import com.modernqr.app.domain.qr.QrPayloadParser
+import com.modernqr.app.domain.qr.QrPayloadValidator
+import com.modernqr.app.domain.qr.WifiSecurity
 import com.modernqr.app.viewmodel.MainViewModel
 import java.io.File
 import java.io.OutputStream
-
-/** Payload types for smart detection */
-private enum class PayloadType {
-    TEXT, URL, WIFI, GEO, VCARD, EMAIL, PHONE, SMS
-}
-
-private fun detectPayload(content: String): PayloadType {
-    val trimmed = content.trim()
-    return when {
-        trimmed.startsWith("http://", true) || trimmed.startsWith("https://", true) -> PayloadType.URL
-        trimmed.startsWith("WIFI:", true) -> PayloadType.WIFI
-        trimmed.startsWith("geo:", true) -> PayloadType.GEO
-        trimmed.startsWith("BEGIN:VCARD", true) -> PayloadType.VCARD
-        trimmed.startsWith("MATMSG:", true) -> PayloadType.EMAIL
-        trimmed.startsWith("tel:", true) -> PayloadType.PHONE
-        trimmed.startsWith("smsto:", true) -> PayloadType.SMS
-        trimmed.contains("@") && trimmed.contains(".") -> PayloadType.EMAIL
-        else -> PayloadType.TEXT
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +48,7 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedType by remember { mutableStateOf("Smart") }
-    val types = listOf("Smart", "Text", "URL", "WiFi", "Location", "Contact", "Email", "Phone", "SMS", "All-in-One")
+    val types = listOf("Smart", "Text", "URL", "WiFi", "Location", "Contact", "Email", "Phone", "SMS", "Contact Card")
 
     // Input states
     var smartInput by remember { mutableStateOf("") }
@@ -160,7 +145,7 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
             // Input fields per type
             when (selectedType) {
                 "Smart" -> {
-                    val suggestedPayload = remember(smartInput) { detectPayload(smartInput) }
+                    val suggestedPayload = remember(smartInput) { QrPayloadParser.parse(smartInput) }
                     OutlinedTextField(
                         value = smartInput,
                         onValueChange = { smartInput = it },
@@ -170,7 +155,7 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                     if (smartInput.isNotBlank()) {
                         AssistChip(
                             onClick = { /* no action needed, just indication */ },
-                            label = { Text("Detected: ${suggestedPayload.name}") }
+                            label = { Text("Detected: ${suggestedPayload.type.displayName}") }
                         )
                     }
                 }
@@ -233,7 +218,13 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(value = smsMessageInput, onValueChange = { smsMessageInput = it }, label = { Text("Message") }, modifier = Modifier.fillMaxWidth())
                 }
-                "All-in-One" -> {
+                "Contact Card" -> {
+                    Text(
+                        "Creates a vCard contact. Wi-Fi, location, and notes are stored in its notes field.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(value = allName, onValueChange = { allName = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(value = allPhone, onValueChange = { allPhone = it }, label = { Text("Phone") }, modifier = Modifier.fillMaxWidth())
@@ -309,39 +300,45 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
 
             Button(
                 onClick = {
-                    val contentToEncode = when (selectedType) {
-                        "Smart" -> smartInput
-                        "Text" -> textInput
-                        "URL" -> urlInput
-                        "WiFi" -> "WIFI:S:$ssidInput;T:$wifiType;P:$passwordInput;;"
-                        "Location" -> "geo:$latInput,$lngInput"
-                        "Contact" -> "BEGIN:VCARD\nVERSION:3.0\nN:$nameInput\nTEL:$phoneInput\nEMAIL:$emailInput\nEND:VCARD"
-                        "Email" -> "MATMSG:TO:$emailOnlyInput;SUB:$emailSubjectInput;BODY:$emailBodyInput;;"
-                        "Phone" -> "tel:$phoneOnlyInput"
-                        "SMS" -> "smsto:$smsPhoneInput:$smsMessageInput"
-                        "All-in-One" -> {
-                            val sb = StringBuilder("BEGIN:VCARD\nVERSION:3.0\n")
-                            if (allName.isNotEmpty()) sb.append("N:$allName\n")
-                            if (allPhone.isNotEmpty()) sb.append("TEL:$allPhone\n")
-                            if (allEmail.isNotEmpty()) sb.append("EMAIL:$allEmail\n")
-                            if (allUrl.isNotEmpty()) sb.append("URL:$allUrl\n")
-                            var noteStr = ""
-                            if (allWifiSsid.isNotEmpty()) noteStr += "WiFi: $allWifiSsid / $allWifiPass. "
-                            if (allLocation.isNotEmpty()) noteStr += "Loc: $allLocation. "
-                            if (allNotes.isNotEmpty()) noteStr += "Notes: $allNotes."
-                            if (noteStr.isNotEmpty()) sb.append("NOTE:$noteStr\n")
-                            sb.append("END:VCARD")
-                            sb.toString()
-                        }
-                        else -> ""
+                    val payload = when (selectedType) {
+                        "Smart" -> QrPayloadParser.parse(smartInput)
+                        "Text" -> QrPayload.PlainText(textInput)
+                        "URL" -> QrPayload.Url(urlInput)
+                        "WiFi" -> QrPayload.Wifi(
+                            ssid = ssidInput,
+                            password = passwordInput,
+                            security = WifiSecurity.fromWireValue(wifiType) ?: WifiSecurity.WPA
+                        )
+                        "Location" -> QrPayload.Geo(
+                            latitude = latInput.toDoubleOrNull() ?: Double.NaN,
+                            longitude = lngInput.toDoubleOrNull() ?: Double.NaN
+                        )
+                        "Contact" -> QrPayload.VCard(nameInput, phoneInput, emailInput)
+                        "Email" -> QrPayload.Email(emailOnlyInput, emailSubjectInput, emailBodyInput)
+                        "Phone" -> QrPayload.Telephone(phoneOnlyInput)
+                        "SMS" -> QrPayload.Sms(smsPhoneInput, smsMessageInput)
+                        "Contact Card" -> QrPayload.VCard(
+                            name = allName,
+                            phone = allPhone,
+                            email = allEmail,
+                            url = allUrl,
+                            note = buildList {
+                                if (allWifiSsid.isNotEmpty()) add("Wi-Fi: $allWifiSsid / $allWifiPass")
+                                if (allLocation.isNotEmpty()) add("Location: $allLocation")
+                                if (allNotes.isNotEmpty()) add(allNotes)
+                            }.joinToString("\n")
+                        )
+                        else -> QrPayload.PlainText("")
                     }
 
-                    if (contentToEncode.isBlank()) {
-                        errorMessage = "Please fill in the required fields first"
+                    val validation = QrPayloadValidator.validate(payload)
+                    if (!validation.isValid) {
+                        errorMessage = validation.message ?: "Check the entered details."
                         return@Button
                     }
 
                     try {
+                        val contentToEncode = QrPayloadEncoder.encode(payload)
                         val writer = MultiFormatWriter()
                         val matrix = writer.encode(contentToEncode, BarcodeFormat.QR_CODE, 512, 512)
                         val encoder = BarcodeEncoder()
