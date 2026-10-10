@@ -100,7 +100,9 @@ overridden. The audio resource is released when the scanner leaves the screen.
 To provide its functionality, the app requires the following permissions:
 - `android.permission.CAMERA`: Required to scan QR codes and barcodes.
 - `android.permission.VIBRATE`: Provides haptic feedback upon successful scan.
-- `android.permission.WRITE_EXTERNAL_STORAGE`: Required to save generated QR codes to the device's storage on older Android versions (API 28 and below).
+
+Generated QR codes are saved through MediaStore on Android 10 and newer. Android 7–9 uses the
+system document picker, so the app does not need broad storage access on any supported version.
 
 ## 👨‍💻 Developer Details
 - **Developer**: Aarav Khanal
