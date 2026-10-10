@@ -299,7 +299,7 @@ private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: 
                 OutlinedButton(
                     onClick = {
                         val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
+                            this.action = Intent.ACTION_SEND
                             putExtra(Intent.EXTRA_TEXT, result)
                             type = "text/plain"
                         }
