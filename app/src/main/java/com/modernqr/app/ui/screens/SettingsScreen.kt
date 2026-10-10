@@ -100,7 +100,7 @@ fun SettingsScreen() {
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
 
             // Scan Sound toggle
             Row(

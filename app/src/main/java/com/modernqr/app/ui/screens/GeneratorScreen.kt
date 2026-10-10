@@ -310,9 +310,9 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
             Button(
                 onClick = {
                     val contentToEncode = when (selectedType) {
-                        "Smart" -> smartInput,
-                        "Text" -> textInput,
-                        "URL" -> urlInput,
+                        "Smart" -> smartInput
+                        "Text" -> textInput
+                        "URL" -> urlInput
                         "WiFi" -> "WIFI:S:$ssidInput;T:$wifiType;P:$passwordInput;;"
                         "Location" -> "geo:$latInput,$lngInput"
                         "Contact" -> "BEGIN:VCARD\nVERSION:3.0\nN:$nameInput\nTEL:$phoneInput\nEMAIL:$emailInput\nEND:VCARD"
