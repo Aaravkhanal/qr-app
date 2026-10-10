@@ -14,6 +14,7 @@ class SettingsManager(private val context: Context) {
         val AUTO_SCAN = booleanPreferencesKey("auto_scan")
         val SCAN_SOUND = booleanPreferencesKey("scan_sound")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
+        val SAVE_HISTORY = booleanPreferencesKey("save_history")
     }
 
     val themeModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -30,6 +31,10 @@ class SettingsManager(private val context: Context) {
 
     val hapticFeedbackFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[HAPTIC_FEEDBACK] ?: true
+    }
+
+    val saveHistoryFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[SAVE_HISTORY] ?: true
     }
 
     suspend fun setThemeMode(mode: Int) {
@@ -53,6 +58,12 @@ class SettingsManager(private val context: Context) {
     suspend fun setHapticFeedback(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[HAPTIC_FEEDBACK] = enabled
+        }
+    }
+
+    suspend fun setSaveHistory(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SAVE_HISTORY] = enabled
         }
     }
 }

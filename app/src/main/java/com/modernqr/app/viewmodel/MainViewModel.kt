@@ -4,13 +4,16 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.modernqr.app.data.AppDatabase
+import com.modernqr.app.data.HistoryRepository
 import com.modernqr.app.data.HistoryItem
+import com.modernqr.app.data.SettingsManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val dao = AppDatabase.getDatabase(application).historyDao()
+    private val repository = HistoryRepository(AppDatabase.getDatabase(application).historyDao())
+    private val settings = SettingsManager(application)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -21,18 +24,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     @OptIn(ExperimentalCoroutinesApi::class)
     val history: StateFlow<List<HistoryItem>> = _searchQuery
         .combine(_filterType) { query, filter -> Pair(query, filter) }
-        .flatMapLatest { (query, filter) ->
-            val baseFlow = if (query.isBlank()) dao.getAllHistory() else dao.searchHistory(query)
-            baseFlow.map { items ->
-                when (filter) {
-                    "Scanned" -> items.filter { it.type == "Scanned" }
-                    "Generated" -> items.filter { it.type == "Generated" }
-                    "Pinned" -> items.filter { it.isPinned }
-                    else -> items
-                }
-            }
-        }
+        .flatMapLatest { (query, filter) -> repository.observeHistory(query, filter) }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val historyCount: StateFlow<Int> = repository.observeCount()
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
+    init {
+        viewModelScope.launch { repository.removePreviouslyStoredSensitiveEntries() }
+    }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
@@ -44,25 +44,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addHistoryItem(content: String, format: String, type: String) {
         viewModelScope.launch {
-            dao.insert(HistoryItem(content = content, format = format, type = type))
+            if (settings.saveHistoryFlow.first()) repository.add(content, format, type)
         }
     }
 
     fun updateHistoryItem(item: HistoryItem) {
         viewModelScope.launch {
-            dao.update(item)
+            repository.update(item)
         }
     }
 
     fun deleteHistoryItem(item: HistoryItem) {
         viewModelScope.launch {
-            dao.delete(item)
+            repository.delete(item)
         }
     }
 
     fun clearHistory() {
         viewModelScope.launch {
-            dao.clearHistory()
+            repository.clear()
         }
     }
 }

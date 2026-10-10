@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.modernqr.app.data.HistoryItem
 import com.modernqr.app.domain.qr.QrAction
 import com.modernqr.app.domain.qr.QrActionResolver
 import com.modernqr.app.domain.qr.QrPayloadParser
@@ -43,7 +44,9 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
     val historyItems by viewModel.history.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
+    val historyCount by viewModel.historyCount.collectAsState()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<HistoryItem?>(null) }
     val filterOptions = listOf("All", "Scanned", "Generated", "Pinned")
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -66,7 +69,7 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    if (historyItems.isNotEmpty() || searchQuery.isNotEmpty()) {
+                    if (historyCount > 0) {
                         IconButton(onClick = { showClearHistoryDialog = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Clear History")
                         }
@@ -110,23 +113,36 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
         }
 
         if (historyItems.isEmpty()) {
+            val hasSearch = searchQuery.isNotBlank()
+            val isFiltered = filterType != "All"
+            val emptyTitle = when {
+                hasSearch -> "No matching history"
+                isFiltered -> "No ${filterType.lowercase()} items"
+                else -> "No history yet"
+            }
+            val emptyDescription = when {
+                hasSearch && isFiltered -> "No $filterType items match this literal search"
+                hasSearch -> "Try a different search term"
+                isFiltered -> "Choose another filter or create a new item"
+                else -> "Scan or generate a non-sensitive QR code to get started"
+            }
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "🔍" else "📋",
+                        text = if (hasSearch || isFiltered) "🔍" else "📋",
                         style = MaterialTheme.typography.displayMedium
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "No results found" else "No history yet",
+                        text = emptyTitle,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (searchQuery.isNotEmpty()) "Try a different search term" else "Scan or generate a QR code to get started",
+                        text = emptyDescription,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -142,7 +158,7 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
                     HistoryItemCard(
                         item = item,
                         onPin = { viewModel.updateHistoryItem(item.copy(isPinned = !item.isPinned)) },
-                        onDelete = { viewModel.deleteHistoryItem(item) }
+                        onDelete = { pendingDelete = item }
                     )
                 }
             }
@@ -165,11 +181,28 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
             }
         )
     }
+
+    pendingDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete history item?") },
+            text = { Text("This removes the selected item from local history.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteHistoryItem(item)
+                    pendingDelete = null
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
 private fun HistoryItemCard(
-    item: com.modernqr.app.data.HistoryItem,
+    item: HistoryItem,
     onPin: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -261,48 +294,63 @@ private fun HistoryItemCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Action row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Smart action buttons
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (action != QrAction.None) {
-                        OutlinedButton(
-                            onClick = { launchQrAction(context, action) },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) { Text(action.label(), style = MaterialTheme.typography.labelSmall) }
-                    } else {
-                        Text(
-                            "Tap to copy",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val narrow = maxWidth < 300.dp
+                if (narrow) {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                        HistoryPrimaryAction(action) { launchQrAction(context, action) }
+                        HistoryManagementActions(item, onPin, onDelete)
                     }
-                }
-
-                Row {
-                    IconButton(onClick = onPin, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            if (item.isPinned) Icons.Filled.Star else Icons.Outlined.Star,
-                            contentDescription = if (item.isPinned) "Unpin" else "Pin",
-                            tint = if (item.isPinned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HistoryPrimaryAction(action) { launchQrAction(context, action) }
+                        HistoryManagementActions(item, onPin, onDelete)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HistoryPrimaryAction(action: QrAction, onAction: () -> Unit) {
+    if (action != QrAction.None) {
+        OutlinedButton(
+            onClick = onAction,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.height(32.dp)
+        ) { Text(action.label(), style = MaterialTheme.typography.labelSmall) }
+    } else {
+        Text(
+            "Tap to copy",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+    }
+}
+
+@Composable
+private fun HistoryManagementActions(item: HistoryItem, onPin: () -> Unit, onDelete: () -> Unit) {
+    Row {
+        IconButton(onClick = onPin, modifier = Modifier.size(36.dp)) {
+            Icon(
+                if (item.isPinned) Icons.Filled.Star else Icons.Outlined.Star,
+                contentDescription = if (item.isPinned) "Unpin" else "Pin",
+                tint = if (item.isPinned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "Delete",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

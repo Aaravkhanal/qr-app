@@ -24,6 +24,7 @@ fun SettingsScreen() {
     val themeMode by settingsManager.themeModeFlow.collectAsState(initial = 2)
     val hapticEnabled by settingsManager.hapticFeedbackFlow.collectAsState(initial = true)
     val soundEnabled by settingsManager.scanSoundFlow.collectAsState(initial = true)
+    val saveHistoryEnabled by settingsManager.saveHistoryFlow.collectAsState(initial = true)
 
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
@@ -129,6 +130,33 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        SettingsSection(title = "Privacy") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Save to history", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Save non-sensitive scans and generated codes. Wi-Fi, contacts, email, phone, and SMS are always excluded.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = saveHistoryEnabled,
+                    onCheckedChange = {
+                        coroutineScope.launch { settingsManager.setSaveHistory(it) }
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         // About
         SettingsSection(title = "About") {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -158,7 +186,7 @@ fun SettingsScreen() {
                 androidx.compose.foundation.text.ClickableText(
                     text = androidx.compose.ui.text.AnnotatedString("Privacy Policy"),
                     style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary),
-                    onClick = { uriHandler.openUri("https://docs.google.com/document/d/1KkKbtngJ4Nq-I-uX4OAik2w3YD889olWSKZ1AYuTixE/edit?usp=sharing") }
+                    onClick = { uriHandler.openUri("https://github.com/Aaravkhanal/qr-app/blob/master/PRIVACY_POLICY.md") }
                 )
             }
         }

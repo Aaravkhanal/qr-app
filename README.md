@@ -13,7 +13,7 @@ A fast, modern, and completely ad-free QR Scanner and Barcode Reader built nativ
   - Smart copy-to-clipboard functionality.
 - **Upload from Gallery**: Scan QR codes from images saved on your device.
 - **Torch Control**: Easily toggle the camera flashlight for scanning in low-light environments.
-- **History Management**: Automatically save scanned items. Pin important codes to the top, or selectively delete history items with confirmation prompts.
+- **History Management**: Optionally save non-sensitive scans and generated codes. Consecutive duplicates are skipped, and sensitive Wi-Fi, contact, email, phone, and SMS payloads are excluded.
 - **No Ads, No Trackers**: 100% privacy-focused.
 - **Fully Offline**: Does not require an internet connection to scan and decode.
 
@@ -104,12 +104,17 @@ To provide its functionality, the app requires the following permissions:
 Generated QR codes are saved through MediaStore on Android 10 and newer. Android 7–9 uses the
 system document picker, so the app does not need broad storage access on any supported version.
 
+App backup is disabled. History and preferences remain local and are not intentionally included in
+cloud backup. The optional history setting stores only non-sensitive payloads; Wi-Fi credentials,
+contacts, email, telephone, and SMS payloads are always excluded. Gallery images are decoded locally
+and are not copied into app storage.
+
 ## 👨‍💻 Developer Details
 - **Developer**: Aarav Khanal
 - **Contact**: [khanalaarav2063@gmail.com](mailto:khanalaarav2063@gmail.com)
 - **GitHub**: [Aaravkhanal](https://github.com/Aaravkhanal)
 - **Website**: [github.com/Aaravkhanal](https://github.com/Aaravkhanal/)
-- **Privacy Policy**: [Read Here](https://docs.google.com/document/d/1lsuML4n8tc4_V2ltfkkAxb57SFENPnabYSzk9h829mc/edit?usp=sharing)
+- **Privacy Policy**: [Read Here](https://github.com/Aaravkhanal/qr-app/blob/master/PRIVACY_POLICY.md)
 
 ## 📄 License
 © 2026 Aarav Khanal. All rights reserved.
