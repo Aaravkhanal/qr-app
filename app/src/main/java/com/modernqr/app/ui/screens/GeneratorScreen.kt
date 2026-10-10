@@ -4,7 +4,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -33,23 +32,43 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
-import com.google.zxing.qrcode.encoder.Encoder
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.modernqr.app.viewmodel.MainViewModel
 import java.io.File
 import java.io.OutputStream
+
+/** Payload types for smart detection */
+private enum class PayloadType {
+    TEXT, URL, WIFI, GEO, VCARD, EMAIL, PHONE, SMS
+}
+
+private fun detectPayload(content: String): PayloadType {
+    val trimmed = content.trim()
+    return when {
+        trimmed.startsWith("http://", true) || trimmed.startsWith("https://", true) -> PayloadType.URL
+        trimmed.startsWith("WIFI:", true) -> PayloadType.WIFI
+        trimmed.startsWith("geo:", true) -> PayloadType.GEO
+        trimmed.startsWith("BEGIN:VCARD", true) -> PayloadType.VCARD
+        trimmed.startsWith("MATMSG:", true) -> PayloadType.EMAIL
+        trimmed.startsWith("tel:", true) -> PayloadType.PHONE
+        trimmed.startsWith("smsto:", true) -> PayloadType.SMS
+        trimmed.contains("@") && trimmed.contains(".") -> PayloadType.EMAIL
+        else -> PayloadType.TEXT
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var selectedType by remember { mutableStateOf("Text") }
-    val types = listOf("Text", "URL", "WiFi", "Location", "Contact", "Email", "Phone", "SMS", "All-in-One")
+    var selectedType by remember { mutableStateOf("Smart") }
+    val types = listOf("Smart", "Text", "URL", "WiFi", "Location", "Contact", "Email", "Phone", "SMS", "All-in-One")
 
     // Input states
+    var smartInput by remember { mutableStateOf("") }
     var textInput by remember { mutableStateOf("") }
+    var urlInput by remember { mutableStateOf("") }
 
     // WiFi
     var ssidInput by remember { mutableStateOf("") }
@@ -101,7 +120,6 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
         Color(0xFFFFF8E1), Color(0xFFFCE4EC)
     )
 
-    var showColorPicker by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -141,13 +159,32 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
 
             // Input fields per type
             when (selectedType) {
+                "Smart" -> {
+                    val suggestedPayload = remember(smartInput) { detectPayload(smartInput) }
+                    OutlinedTextField(
+                        value = smartInput,
+                        onValueChange = { smartInput = it },
+                        label = { Text("Enter data (smart detection will suggest type)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (smartInput.isNotBlank()) {
+                        AssistChip(
+                            onClick = { /* no action needed, just indication */ },
+                            label = { Text("Detected: ${suggestedPayload.name}") }
+                        )
+                    }
+                }
                 "Text" -> OutlinedTextField(
-                    value = textInput, onValueChange = { textInput = it },
-                    label = { Text("Enter text") }, modifier = Modifier.fillMaxWidth()
+                    value = textInput,
+                    onValueChange = { textInput = it },
+                    label = { Text("Enter text") },
+                    modifier = Modifier.fillMaxWidth()
                 )
                 "URL" -> OutlinedTextField(
-                    value = textInput, onValueChange = { textInput = it },
-                    label = { Text("Enter URL (e.g., https://...)") }, modifier = Modifier.fillMaxWidth()
+                    value = urlInput,
+                    onValueChange = { urlInput = it },
+                    label = { Text("Enter URL (e.g., https://...)") },
+                    modifier = Modifier.fillMaxWidth()
                 )
                 "WiFi" -> {
                     OutlinedTextField(value = ssidInput, onValueChange = { ssidInput = it }, label = { Text("Network Name (SSID)") }, modifier = Modifier.fillMaxWidth())
@@ -273,7 +310,9 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
             Button(
                 onClick = {
                     val contentToEncode = when (selectedType) {
-                        "Text", "URL" -> textInput
+                        "Smart" -> smartInput,
+                        "Text" -> textInput,
+                        "URL" -> urlInput,
                         "WiFi" -> "WIFI:S:$ssidInput;T:$wifiType;P:$passwordInput;;"
                         "Location" -> "geo:$latInput,$lngInput"
                         "Contact" -> "BEGIN:VCARD\nVERSION:3.0\nN:$nameInput\nTEL:$phoneInput\nEMAIL:$emailInput\nEND:VCARD"

@@ -41,9 +41,9 @@ A fast, modern, and completely ad-free QR Scanner and Barcode Reader built nativ
 Anyone can clone and build this application locally using Android Studio.
 
 ### Prerequisites
-- **Android Studio** (Jellyfish or newer recommended)
-- **JDK 17** or newer
-- **Android SDK** API level 36 (Android 16)
+- **Android Studio** with Android Gradle Plugin 8.10 support
+- **JDK 17** (the version used by CI and required for reproducible builds)
+- **Android SDK Platform 36** and the latest available SDK Build Tools
 
 ### Build Instructions
 1. **Clone the repository**:
@@ -53,20 +53,36 @@ Anyone can clone and build this application locally using Android Studio.
    ```
 2. **Open the project**:
    Open Android Studio -> `File` -> `Open...` and select the project directory.
-3. **Sync Gradle**:
+3. **Configure the Android SDK**:
+   Install Android SDK Platform 36 through Android Studio's SDK Manager. Android Studio normally creates a local, untracked `local.properties` file containing your SDK path. For command-line builds, either create that file locally or set `ANDROID_HOME`; never commit machine-specific SDK paths.
+4. **Use JDK 17**:
+   Select JDK 17 as the Gradle JDK in Android Studio. For command-line builds, make sure `JAVA_HOME` points to a JDK 17 installation.
+5. **Sync Gradle**:
    Allow Android Studio to download dependencies and sync the Gradle files.
-4. **Build the APK**:
+6. **Build and verify**:
    ```bash
-   # Build a debug APK
-   ./gradlew assembleDebug
+   ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 
-   # Build a release Android App Bundle (AAB) for Play Store
+   # Produces an unsigned bundle unless release signing is configured below.
    ./gradlew bundleRelease
    ```
-5. **Install on Device**:
+7. **Install on Device**:
    ```bash
    ./gradlew installDebug
    ```
+
+### Release Signing
+
+Local release builds are unsigned by default, so a fresh clone can run `assembleRelease` without private signing material. To create a signed release, add an untracked `keystore.properties` file in the project root:
+
+```properties
+storeFile=/absolute/path/to/release.keystore
+storePassword=your-store-password
+keyAlias=your-key-alias
+keyPassword=your-key-password
+```
+
+The keystore and `keystore.properties` are ignored by Git. Keep both files outside version control and provide them to CI through encrypted secrets when publishing.
 
 ## 🐛 Bug Fixes & Improvements
 - **Wi-Fi Connection Stability**: Fixed issues with legacy parsing and improved connection handling for both Android 10+ (using `WifiNetworkSuggestion`/`WifiNetworkSpecifier`) and older devices (using legacy `WifiManager`).
