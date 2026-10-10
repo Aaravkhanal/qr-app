@@ -96,7 +96,7 @@ To provide its functionality, the app requires the following permissions:
 - `android.permission.VIBRATE`: Provides haptic feedback upon successful scan.
 - `android.permission.INTERNET`: Used only for opening scanned URLs in the external browser.
 - `android.permission.ACCESS_WIFI_STATE` & `CHANGE_WIFI_STATE`: Required to automatically connect to scanned Wi-Fi networks.
-- `android.permission.ACCESS_FINE_LOCATION`: Required by Android system for Wi-Fi connection capabilities on certain API levels.
+- `android.permission.ACCESS_COARSE_LOCATION` & `ACCESS_FINE_LOCATION`: Required by Android system for Wi-Fi connection capabilities on certain API levels.
 - `android.permission.WRITE_EXTERNAL_STORAGE`: Required to save generated QR codes to the device's storage on older Android versions (API 28 and below).
 
 ## 👨‍💻 Developer Details
