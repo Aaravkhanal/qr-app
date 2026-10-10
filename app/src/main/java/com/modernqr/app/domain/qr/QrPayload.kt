@@ -26,7 +26,7 @@ sealed interface QrPayload {
     data class Wifi(
         val ssid: String,
         val password: String = "",
-        val security: WifiSecurity = WifiSecurity.WPA,
+        val security: WifiSecurity = WifiSecurity.WPA2,
         val hidden: Boolean = false
     ) : QrPayload {
         override val type = QrPayloadType.WIFI
@@ -52,6 +52,9 @@ sealed interface QrPayload {
         val body: String = ""
     ) : QrPayload {
         override val type = QrPayloadType.EMAIL
+
+        val recipients: List<String>
+            get() = address.split(',', ';').map(String::trim).filter(String::isNotEmpty)
     }
 
     data class Telephone(val number: String) : QrPayload {
@@ -69,14 +72,19 @@ sealed interface QrPayload {
 }
 
 enum class WifiSecurity(val wireValue: String) {
-    WPA("WPA"),
+    WPA2("WPA"),
+    WPA3("SAE"),
     WEP("WEP"),
-    NONE("nopass");
+    NONE("nopass"),
+    UNSUPPORTED("unknown");
 
     companion object {
-        fun fromWireValue(value: String): WifiSecurity? = entries.firstOrNull {
-            it.wireValue.equals(value, ignoreCase = true) ||
-                (it == WPA && value.equals("WPA2", ignoreCase = true))
+        fun fromWireValue(value: String): WifiSecurity? = when {
+            value.equals("WPA", true) || value.equals("WPA2", true) -> WPA2
+            value.equals("WPA3", true) || value.equals("SAE", true) -> WPA3
+            value.equals("WEP", true) -> WEP
+            value.equals("nopass", true) || value.equals("NONE", true) -> NONE
+            else -> null
         }
     }
 }
@@ -89,9 +97,20 @@ data class QrValidationResult(val errors: List<String>) {
 sealed interface QrAction {
     data class OpenUrl(val url: String) : QrAction
     data class OpenMap(val latitude: Double, val longitude: Double) : QrAction
-    data class ConnectWifi(val ssid: String, val password: String, val security: WifiSecurity) : QrAction
-    data class AddContact(val encodedVCard: String) : QrAction
-    data class SendEmail(val address: String, val subject: String, val body: String) : QrAction
+    data class AddWifiNetwork(
+        val ssid: String,
+        val password: String,
+        val security: WifiSecurity,
+        val hidden: Boolean
+    ) : QrAction
+    data class AddContact(
+        val name: String,
+        val phone: String,
+        val email: String,
+        val url: String,
+        val note: String
+    ) : QrAction
+    data class SendEmail(val recipients: List<String>, val subject: String, val body: String) : QrAction
     data class Dial(val number: String) : QrAction
     data class SendSms(val number: String, val message: String) : QrAction
     data object None : QrAction

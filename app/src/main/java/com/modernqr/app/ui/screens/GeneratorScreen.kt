@@ -58,9 +58,9 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
     // WiFi
     var ssidInput by remember { mutableStateOf("") }
     var passwordInput by remember { mutableStateOf("") }
-    var wifiType by remember { mutableStateOf("WPA") }
+    var wifiType by remember { mutableStateOf("WPA2") }
     var expandedWifiType by remember { mutableStateOf(false) }
-    val wifiTypes = listOf("WPA", "WEP", "nopass")
+    val wifiTypes = listOf("WPA2", "WPA3", "WEP", "nopass")
 
     // Location
     var latInput by remember { mutableStateOf("") }
@@ -307,7 +307,7 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                         "WiFi" -> QrPayload.Wifi(
                             ssid = ssidInput,
                             password = passwordInput,
-                            security = WifiSecurity.fromWireValue(wifiType) ?: WifiSecurity.WPA
+                            security = WifiSecurity.fromWireValue(wifiType) ?: WifiSecurity.WPA2
                         )
                         "Location" -> QrPayload.Geo(
                             latitude = latInput.toDoubleOrNull() ?: Double.NaN,

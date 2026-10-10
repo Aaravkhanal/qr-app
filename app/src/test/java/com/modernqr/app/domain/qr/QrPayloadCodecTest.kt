@@ -14,10 +14,11 @@ class QrPayloadCodecTest {
             QrPayload.Wifi(
                 ssid = "Office;Guest:5G,East\\Wing\nFloor 2",
                 password = "p;ass:word,\\line\nnext",
-                security = WifiSecurity.WPA,
+                security = WifiSecurity.WPA2,
                 hidden = true
             ),
             QrPayload.Wifi("Open network", security = WifiSecurity.NONE),
+            QrPayload.Wifi("Secure 3", "password3", WifiSecurity.WPA3, hidden = true),
             QrPayload.Geo(27.7172, 85.324),
             QrPayload.VCard(
                 name = "Khanal, Aarav; देव",
@@ -48,6 +49,8 @@ class QrPayloadCodecTest {
         val cases = listOf(
             Case("HTTPS://Example.com/Path", QrPayload.Url("HTTPS://Example.com/Path")),
             Case("wifi:t:WEP;s:Cafe\\; East;p:a\\:b;;", QrPayload.Wifi("Cafe; East", "a:b", WifiSecurity.WEP)),
+            Case("WIFI:T:SAE;S:Hidden;P:password3;H:true;;", QrPayload.Wifi("Hidden", "password3", WifiSecurity.WPA3, true)),
+            Case("WIFI:T:enterprise;S:Office;;", QrPayload.Wifi("Office", security = WifiSecurity.UNSUPPORTED)),
             Case("GEO:-33.86,151.21", QrPayload.Geo(-33.86, 151.21)),
             Case(
                 "begin:vcard\nversion:3.0\nfn:Zoë\ntel:+33123456789\nend:vcard",
@@ -120,13 +123,14 @@ class QrPayloadValidatorTest {
             Case(QrPayload.Url("https://bad host"), "Enter a valid HTTP or HTTPS URL."),
             Case(QrPayload.Wifi("", "password"), "Enter a Wi-Fi network name (SSID)."),
             Case(QrPayload.Wifi("📶".repeat(9), security = WifiSecurity.NONE), "The Wi-Fi network name must be 32 bytes or fewer."),
-            Case(QrPayload.Wifi("Office", "", WifiSecurity.WPA), "Enter the Wi-Fi password, or choose no password."),
+            Case(QrPayload.Wifi("Office", "", WifiSecurity.WPA2), "Enter the Wi-Fi password, or choose no password."),
+            Case(QrPayload.Wifi("Office", "short", WifiSecurity.WPA3), "WPA2 and WPA3 passwords must contain 8 to 63 characters."),
             Case(QrPayload.Geo(90.1, 0.0), "Latitude must be between -90 and 90."),
             Case(QrPayload.Geo(0.0, -180.1), "Longitude must be between -180 and 180."),
             Case(QrPayload.VCard(""), "Enter a contact name."),
             Case(QrPayload.VCard("Name", phone = "call-me"), "Enter a valid contact phone number."),
             Case(QrPayload.VCard("Name", email = "invalid@"), "Enter a valid contact email address."),
-            Case(QrPayload.Email("missing-at.example.com"), "Enter a valid email address."),
+            Case(QrPayload.Email("missing-at.example.com"), "Enter valid email recipients separated by commas."),
             Case(QrPayload.Telephone("12"), "Enter a valid phone number."),
             Case(QrPayload.Sms("", "hello"), "Enter a phone number."),
             Case(QrPayload.Unknown("", "EAN_13"), "This barcode does not contain any data.")
@@ -164,8 +168,12 @@ class QrActionResolverTest {
         val cases = mapOf<QrPayload, QrAction>(
             QrPayload.Url("example.com") to QrAction.OpenUrl("https://example.com"),
             QrPayload.Geo(1.0, 2.0) to QrAction.OpenMap(1.0, 2.0),
-            QrPayload.Wifi("Cafe", "secret") to QrAction.ConnectWifi("Cafe", "secret", WifiSecurity.WPA),
-            QrPayload.Email("a@example.com", "Hi", "Body") to QrAction.SendEmail("a@example.com", "Hi", "Body"),
+            QrPayload.Wifi("Cafe", "secret123") to QrAction.AddWifiNetwork("Cafe", "secret123", WifiSecurity.WPA2, false),
+            QrPayload.Email("a@example.com, b@example.com", "Hi", "Body") to QrAction.SendEmail(
+                listOf("a@example.com", "b@example.com"),
+                "Hi",
+                "Body"
+            ),
             QrPayload.Telephone("12345") to QrAction.Dial("12345"),
             QrPayload.Sms("12345", "a:b") to QrAction.SendSms("12345", "a:b"),
             QrPayload.PlainText("hello") to QrAction.None,
@@ -181,6 +189,14 @@ class QrActionResolverTest {
     fun `vCard action contains a parseable contact`() {
         val payload = QrPayload.VCard("Aarav", "+9779812345678", "aarav@example.com")
         val action = QrActionResolver.resolve(payload) as QrAction.AddContact
-        assertEquals(payload, QrPayloadParser.parse(action.encodedVCard))
+        assertEquals(payload.name, action.name)
+        assertEquals(payload.phone, action.phone)
+        assertEquals(payload.email, action.email)
+    }
+
+    @Test
+    fun `unsafe URL schemes do not resolve to an open action`() {
+        assertEquals(QrAction.None, QrActionResolver.resolve(QrPayload.Url("javascript:alert(1)")))
+        assertEquals(QrAction.None, QrActionResolver.resolve(QrPayload.Url("file:///data/local/tmp/file")))
     }
 }

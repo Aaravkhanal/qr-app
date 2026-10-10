@@ -92,7 +92,7 @@ object QrPayloadParser {
         return QrPayload.Wifi(
             ssid = fields["S"].orEmpty(),
             password = fields["P"].orEmpty(),
-            security = WifiSecurity.fromWireValue(fields["T"].orEmpty()) ?: WifiSecurity.WPA,
+            security = WifiSecurity.fromWireValue(fields["T"].orEmpty()) ?: WifiSecurity.UNSUPPORTED,
             hidden = fields["H"].equals("true", ignoreCase = true)
         )
     }
@@ -241,8 +241,15 @@ object QrPayloadValidator {
                 else if (payload.ssid.toByteArray(StandardCharsets.UTF_8).size > 32) {
                     add("The Wi-Fi network name must be 32 bytes or fewer.")
                 }
-                if (payload.security != WifiSecurity.NONE && payload.password.isBlank()) {
+                if (payload.security != WifiSecurity.NONE &&
+                    payload.security != WifiSecurity.UNSUPPORTED &&
+                    payload.password.isBlank()
+                ) {
                     add("Enter the Wi-Fi password, or choose no password.")
+                } else if ((payload.security == WifiSecurity.WPA2 || payload.security == WifiSecurity.WPA3) &&
+                    !isValidWpaPassphrase(payload.password)
+                ) {
+                    add("WPA2 and WPA3 passwords must contain 8 to 63 characters.")
                 }
             }
             is QrPayload.Geo -> buildList {
@@ -261,7 +268,9 @@ object QrPayloadValidator {
             }
             is QrPayload.Email -> buildList {
                 if (payload.address.isBlank()) add("Enter an email address.")
-                else if (!isValidEmail(payload.address)) add("Enter a valid email address.")
+                else if (payload.recipients.isEmpty() || payload.recipients.any { !isValidEmail(it) }) {
+                    add("Enter valid email recipients separated by commas.")
+                }
             }
             is QrPayload.Telephone -> validatePhone(payload.number)
             is QrPayload.Sms -> validatePhone(payload.number)
@@ -302,6 +311,8 @@ object QrPayloadValidator {
         return digits in 3..15 && PHONE_REGEX.matches(trimmed)
     }
 
+    private fun isValidWpaPassphrase(value: String): Boolean = value.length in 8..63
+
     private val EMAIL_REGEX = Regex("^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$")
     private val PHONE_REGEX = Regex("^\\+?[0-9() .-]+$")
 }
@@ -312,9 +323,20 @@ object QrActionResolver {
         return when (payload) {
             is QrPayload.Url -> QrAction.OpenUrl(QrPayloadEncoder.normalizeUrl(payload.url))
             is QrPayload.Geo -> QrAction.OpenMap(payload.latitude, payload.longitude)
-            is QrPayload.Wifi -> QrAction.ConnectWifi(payload.ssid, payload.password, payload.security)
-            is QrPayload.VCard -> QrAction.AddContact(QrPayloadEncoder.encode(payload))
-            is QrPayload.Email -> QrAction.SendEmail(payload.address, payload.subject, payload.body)
+            is QrPayload.Wifi -> QrAction.AddWifiNetwork(
+                payload.ssid,
+                payload.password,
+                payload.security,
+                payload.hidden
+            )
+            is QrPayload.VCard -> QrAction.AddContact(
+                payload.name,
+                payload.phone,
+                payload.email,
+                payload.url,
+                payload.note
+            )
+            is QrPayload.Email -> QrAction.SendEmail(payload.recipients, payload.subject, payload.body)
             is QrPayload.Telephone -> QrAction.Dial(payload.number)
             is QrPayload.Sms -> QrAction.SendSms(payload.number, payload.message)
             is QrPayload.PlainText, is QrPayload.Unknown -> QrAction.None
