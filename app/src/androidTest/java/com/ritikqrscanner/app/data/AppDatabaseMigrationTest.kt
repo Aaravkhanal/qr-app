@@ -42,7 +42,35 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migration1To2AcceptsEarlyVersionOneSchemaThatAlreadyHadPinning() {
+        helper.createDatabase(TEST_DATABASE_WITH_PIN, 1).apply {
+            execSQL("ALTER TABLE history_table ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+            execSQL(
+                """
+                INSERT INTO history_table (id, content, format, type, timestamp, isPinned)
+                VALUES (2, 'already pinned', 'QR_CODE', 'Generated', 5678, 1)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE_WITH_PIN,
+            2,
+            true,
+            AppDatabase.MIGRATION_1_2
+        ).use { database ->
+            database.query("SELECT content, isPinned FROM history_table WHERE id = 2").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("already pinned", cursor.getString(0))
+                assertEquals(1, cursor.getInt(1))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE = "history-migration-test"
+        const val TEST_DATABASE_WITH_PIN = "history-migration-test-with-pin"
     }
 }

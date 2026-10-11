@@ -11,7 +11,14 @@ import com.ritikqrscanner.app.domain.qr.QrAction
 import com.ritikqrscanner.app.domain.qr.WifiSecurity
 import com.ritikqrscanner.app.R
 
-fun launchQrAction(context: Context, action: QrAction): String? {
+fun launchQrAction(context: Context, action: QrAction): String? =
+    launchQrAction(context, action, AndroidQrIntentDispatcher(context))
+
+internal fun launchQrAction(
+    context: Context,
+    action: QrAction,
+    dispatcher: QrIntentDispatcher
+): String? {
     val prepared = when (action) {
         is QrAction.OpenUrl -> prepareWebUrl(context, action.url)
         is QrAction.OpenMap -> PreparedAction(
@@ -38,16 +45,26 @@ fun launchQrAction(context: Context, action: QrAction): String? {
         return prepared.explanation ?: prepared.unavailableMessage
     }
 
-    if (prepared.intent.resolveActivity(context.packageManager) == null) {
+    if (!dispatcher.canResolve(prepared.intent)) {
         return prepared.unavailableMessage
     }
 
     return try {
-        context.startActivity(prepared.intent)
+        dispatcher.launch(prepared.intent)
         prepared.explanation
     } catch (_: RuntimeException) {
         context.getString(R.string.action_open_failed)
     }
+}
+
+internal interface QrIntentDispatcher {
+    fun canResolve(intent: Intent): Boolean
+    fun launch(intent: Intent)
+}
+
+private class AndroidQrIntentDispatcher(private val context: Context) : QrIntentDispatcher {
+    override fun canResolve(intent: Intent): Boolean = intent.resolveActivity(context.packageManager) != null
+    override fun launch(intent: Intent) = context.startActivity(intent)
 }
 
 fun QrAction.label(context: Context): String = when (this) {

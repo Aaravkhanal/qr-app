@@ -11,9 +11,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = HistoryRepository(AppDatabase.getDatabase(application).historyDao())
-    private val settings = SettingsManager(application)
+class MainViewModel @JvmOverloads constructor(
+    application: Application,
+    private val repository: HistoryRepository = HistoryRepository(AppDatabase.getDatabase(application).historyDao()),
+    private val settings: SettingsManager = SettingsManager(application)
+) : AndroidViewModel(application) {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -42,27 +44,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _filterType.value = filter
     }
 
-    fun addHistoryItem(content: String, format: String, type: String) {
+    fun addHistoryItem(content: String, format: String, type: String) =
         viewModelScope.launch {
             if (settings.saveHistoryFlow.first()) repository.add(content, format, type)
         }
-    }
 
-    fun updateHistoryItem(item: HistoryItem) {
+    fun updateHistoryItem(item: HistoryItem) =
         viewModelScope.launch {
             repository.update(item)
         }
-    }
 
-    fun deleteHistoryItem(item: HistoryItem) {
+    fun deleteHistoryItem(item: HistoryItem) =
         viewModelScope.launch {
             repository.delete(item)
         }
-    }
 
-    fun clearHistory() {
+    fun clearHistory() =
         viewModelScope.launch {
             repository.clear()
         }
-    }
 }

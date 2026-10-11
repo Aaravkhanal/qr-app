@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val settingsManager = remember { SettingsManager(context) }
             val themeMode by settingsManager.themeModeFlow.collectAsState(initial = 2)
-            
+
             val isDarkTheme = when (themeMode) {
                 0 -> false
                 1 -> true
@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 primary = androidx.compose.ui.graphics.Color(0xFF90C2F9),
                 onPrimary = androidx.compose.ui.graphics.Color(0xFF000000)
             )
-            
+
             val lightColors = lightColorScheme(
                 background = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
                 surface = androidx.compose.ui.graphics.Color(0xFFF7F9FC),

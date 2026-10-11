@@ -109,6 +109,38 @@ class QrPayloadCodecTest {
 
         malformed.forEach { assertFalse(QrPayloadValidator.validate(it).isValid) }
     }
+
+    @Test
+    fun `Wi-Fi security variants retain security hidden state and escaped values`() {
+        val cases = listOf(
+            QrPayload.Wifi("Open; café", security = WifiSecurity.NONE),
+            QrPayload.Wifi("WPA2: office", "password8", WifiSecurity.WPA2),
+            QrPayload.Wifi("WPA3\\lab", "password9", WifiSecurity.WPA3, hidden = true),
+            QrPayload.Wifi("Legacy, guest", "wep:key", WifiSecurity.WEP)
+        )
+
+        cases.forEach { payload ->
+            val encoded = QrPayloadEncoder.encode(payload)
+            assertEquals(payload, QrPayloadParser.parse(encoded))
+        }
+    }
+
+    @Test
+    fun `escaping table covers slashes delimiters and line endings`() {
+        val source = "slash\\ semicolon; colon: comma, line\r\nnext"
+        val escaped = QrPayloadEncoder.escape(source)
+
+        assertEquals("slash\\\\ semicolon\\; colon\\: comma\\, line\\nnext", escaped)
+        assertEquals("slash\\ semicolon; colon: comma, line\nnext", QrPayloadParser.unescape(escaped))
+    }
+
+    @Test
+    fun `SMS parser preserves every colon after the recipient`() {
+        assertEquals(
+            QrPayload.Sms("+819012345678", "会議: 10:30: 第2会議室"),
+            QrPayloadParser.parse("SMS:+819012345678:会議: 10:30: 第2会議室")
+        )
+    }
 }
 
 class QrPayloadValidatorTest {

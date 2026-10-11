@@ -311,7 +311,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                             }
                         }
                     )
-                    if (availableCameras.size > 1) {
+                    if (shouldShowCameraSwitch(availableCameras.size)) {
                         ScannerActionButton(
                             icon = Icons.Default.Cameraswitch,
                             label = stringResource(R.string.switch_camera),
@@ -371,7 +371,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
-private fun CameraPermissionContent(
+internal fun CameraPermissionContent(
     permanentlyDenied: Boolean,
     onTryAgain: () -> Unit,
     onOpenSettings: () -> Unit
@@ -596,6 +596,8 @@ fun ScannerActionButton(
 }
 
 private data class CameraOption(val id: Int, val isFrontFacing: Boolean)
+
+internal fun shouldShowCameraSwitch(cameraCount: Int): Boolean = cameraCount > 1
 
 @Suppress("DEPRECATION")
 private fun discoverCameras(): List<CameraOption> = try {

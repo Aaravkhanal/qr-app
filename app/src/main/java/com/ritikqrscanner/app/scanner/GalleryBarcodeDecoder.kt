@@ -29,7 +29,7 @@ suspend fun decodeGalleryBarcode(context: Context, uri: Uri): Result = withConte
         }
 
         val options = BitmapFactory.Options().apply {
-            inSampleSize = calculateSampleSize(bounds.outWidth, bounds.outHeight)
+            inSampleSize = calculateGallerySampleSize(bounds.outWidth, bounds.outHeight)
             inPreferredConfig = Bitmap.Config.RGB_565
         }
         val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
@@ -45,7 +45,7 @@ suspend fun decodeGalleryBarcode(context: Context, uri: Uri): Result = withConte
     }
 }
 
-private fun calculateSampleSize(width: Int, height: Int): Int {
+internal fun calculateGallerySampleSize(width: Int, height: Int): Int {
     var sampleSize = 1
     while (width / sampleSize > MAX_IMAGE_DIMENSION || height / sampleSize > MAX_IMAGE_DIMENSION) {
         sampleSize *= 2

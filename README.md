@@ -75,6 +75,28 @@ Code formatting follows the repository `.editorconfig`. Android Lint is configur
 `app/lint.xml`; run `./gradlew lintDebug` before submitting changes. CI runs unit tests, lint, and
 debug and unsigned-release builds for every change to `master`.
 
+### Automated Tests
+
+Run the fast local checks with:
+
+```bash
+bash scripts/check-formatting.sh
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease
+```
+
+Instrumentation tests cover Room migrations and CRUD behavior, settings persistence, permission
+states, generator validation and restoration, history management, theme selection, and smart-action
+intent dispatch. Run them on a connected device or emulator with:
+
+```bash
+./gradlew connectedDebugAndroidTest
+```
+
+The main CI workflow runs instrumentation tests on API 29. The manually triggered **Android Device
+Matrix** workflow runs the same suite on APIs 24, 28, 29, 30, 33, and 36 with no front camera. The
+emulator also provides the no-hardware-flash path. Compose tests exercise a 280 dp layout at 200%
+font scale, and payload tests include long, escaped, multiline, Unicode, and international values.
+
 ### Release Signing
 
 Local release builds are unsigned by default, so a fresh clone can run `assembleRelease` without private signing material. To create a signed release, add an untracked `keystore.properties` file in the project root:
