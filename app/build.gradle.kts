@@ -70,6 +70,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    lint {
+        lintConfig = file("lint.xml")
+        abortOnError = true
+        checkReleaseBuilds = true
+        warningsAsErrors = false
+    }
 }
 
 kotlin {
@@ -89,6 +95,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // ZXing for QR Code scanning and generation
@@ -110,6 +117,4 @@ dependencies {
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-    // Coil for image loading
-    implementation("io.coil-kt:coil-compose:2.5.0")
 }

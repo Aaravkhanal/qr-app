@@ -48,8 +48,8 @@ Anyone can clone and build this application locally using Android Studio.
 ### Build Instructions
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Aaravkhanal/QRScannerReader.git
-   cd QRScannerReader
+   git clone https://github.com/Aaravkhanal/qr-app.git
+   cd qr-app
    ```
 2. **Open the project**:
    Open Android Studio -> `File` -> `Open...` and select the project directory.
@@ -70,6 +70,10 @@ Anyone can clone and build this application locally using Android Studio.
    ```bash
    ./gradlew installDebug
    ```
+
+Code formatting follows the repository `.editorconfig`. Android Lint is configured in
+`app/lint.xml`; run `./gradlew lintDebug` before submitting changes. CI runs unit tests, lint, and
+debug and unsigned-release builds for every change to `master`.
 
 ### Release Signing
 

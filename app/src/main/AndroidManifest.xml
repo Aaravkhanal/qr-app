@@ -44,13 +44,12 @@
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="QR Scanner &amp; Reader [No ADs]"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.ModernQRApp">
         
         <activity
-            android:name="com.modernqr.app.MainActivity"
+            android:name="com.ritikqrscanner.app.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.ModernQRApp">
             <intent-filter>
