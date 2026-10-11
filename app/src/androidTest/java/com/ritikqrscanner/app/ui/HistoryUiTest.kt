@@ -1,10 +1,11 @@
 package com.ritikqrscanner.app.ui
 
 import android.Manifest
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -44,16 +45,16 @@ class HistoryUiTest {
         composeRule.onNodeWithText("Delete history item?").assertIsDisplayed()
         composeRule.onNodeWithText("Delete").performClick()
         composeRule.waitUntil(2_000) {
-            composeRule.onNodeWithText("newer").fetchSemanticsNodes().isEmpty()
+            composeRule.onAllNodesWithText("newer").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithText("newer").assertDoesNotExist()
+        composeRule.onAllNodesWithText("newer").assertCountEquals(0)
         composeRule.onNodeWithText("older").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Clear history").performClick()
         composeRule.onNodeWithText("Clear history?").assertIsDisplayed()
         composeRule.onNodeWithText("Clear").performClick()
         composeRule.waitUntil(2_000) {
-            composeRule.onNodeWithText("No history yet").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("No history yet").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("No history yet").assertIsDisplayed()
     }
