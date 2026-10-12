@@ -74,5 +74,5 @@ jobs:
         profile: pixel_2
         disk-size: 4G
         disable-animations: true
-        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-front none -camera-back emulated
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -partition-size 4096 -camera-front none -camera-back emulated
         script: ./gradlew connectedDebugAndroidTest
