@@ -40,4 +40,8 @@ jobs:
         disk-size: 4G
         disable-animations: true
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -partition-size 4096 -camera-front none -camera-back emulated
+        pre-emulator-launch-script: |
+          avd_config="$HOME/.android/avd/test.avd/config.ini"
+          sed -i '/^disk.dataPartition.size=/d' "$avd_config"
+          printf '%s\n' 'disk.dataPartition.size=4096M' >> "$avd_config"
         script: ./gradlew connectedDebugAndroidTest
