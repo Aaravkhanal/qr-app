@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,6 +36,7 @@ import com.ritikqrscanner.app.domain.qr.QrPayloadParser
 import com.ritikqrscanner.app.domain.qr.QrPayloadType
 import com.ritikqrscanner.app.ui.label
 import com.ritikqrscanner.app.ui.launchQrAction
+import com.ritikqrscanner.app.ui.ScreenHeader
 import com.ritikqrscanner.app.viewmodel.MainViewModel
 import com.ritikqrscanner.app.R
 import java.text.DateFormat
@@ -59,67 +59,55 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Header
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 2.dp
+        ScreenHeader(
+            title = stringResource(R.string.history_title),
+            subtitle = if (historyCount == 0) {
+                stringResource(R.string.history_subtitle_empty)
+            } else {
+                stringResource(R.string.history_subtitle_count, historyCount)
+            },
+            icon = Icons.AutoMirrored.Filled.List,
+            action = if (historyCount > 0) {
+                {
+                    IconButton(onClick = { showClearHistoryDialog = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.history_clear))
+                    }
+                }
+            } else null
+        )
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { viewModel.setSearchQuery(it) },
+            placeholder = { Text(stringResource(R.string.history_search)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                AnimatedVisibility(visible = searchQuery.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.history_clear_search))
+                    }
+                }
+            },
+            singleLine = true,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.history_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (historyCount > 0) {
-                        IconButton(onClick = { showClearHistoryDialog = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.history_clear))
-                        }
-                    }
-                }
-
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = { Text(stringResource(R.string.history_search)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        AnimatedVisibility(visible = searchQuery.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
-                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.history_clear_search))
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+            items(filterOptions) { (option, label) ->
+                FilterChip(
+                    selected = filterType == option,
+                    onClick = { viewModel.setFilterType(option) },
+                    label = { Text(label) }
                 )
-
-                // Filter Chips
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filterOptions) { (option, label) ->
-                        FilterChip(
-                            selected = filterType == option,
-                            onClick = { viewModel.setFilterType(option) },
-                            label = { Text(label) }
-                        )
-                    }
-                }
             }
         }
+        Spacer(Modifier.height(8.dp))
 
         if (historyItems.isEmpty()) {
             val hasSearch = searchQuery.isNotBlank()

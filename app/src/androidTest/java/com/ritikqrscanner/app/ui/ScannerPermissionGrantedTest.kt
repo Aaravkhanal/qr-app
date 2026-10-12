@@ -22,5 +22,7 @@ class ScannerPermissionGrantedTest {
     @Test
     fun grantedPermissionShowsScannerControls() {
         composeRule.onNodeWithText("Gallery").assertIsDisplayed()
+        composeRule.onNodeWithText("On-device & private").assertIsDisplayed()
+        composeRule.onNodeWithText("Align a QR code inside the frame").assertIsDisplayed()
     }
 }

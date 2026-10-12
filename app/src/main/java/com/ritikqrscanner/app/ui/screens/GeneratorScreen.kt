@@ -24,6 +24,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,6 +55,8 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.WriterException
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.ritikqrscanner.app.domain.qr.*
+import com.ritikqrscanner.app.ui.PrivacyPill
+import com.ritikqrscanner.app.ui.ScreenHeader
 import com.ritikqrscanner.app.viewmodel.MainViewModel
 import com.ritikqrscanner.app.R
 import java.io.File
@@ -200,12 +207,34 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(paddingValues).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            ScrollableTabRow(selectedTabIndex = types.indexOfFirst { it.first == selectedType }, edgePadding = 8.dp, modifier = Modifier.fillMaxWidth()) {
-                types.forEach { (type, label) ->
-                    Tab(
+            ScreenHeader(
+                title = stringResource(R.string.create_title),
+                subtitle = stringResource(R.string.create_subtitle),
+                icon = Icons.Default.QrCode2
+            )
+            PrivacyPill(
+                label = stringResource(R.string.privacy_on_device),
+                modifier = Modifier.align(Alignment.Start).padding(top = 10.dp)
+            )
+            Spacer(Modifier.height(20.dp))
+            Text(
+                stringResource(R.string.create_choose_type),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(types) { (type, label) ->
+                    FilterChip(
                         selected = selectedType == type,
                         onClick = { selectedType = type; qrBitmap = null; lastGeneratedContent = null },
-                        text = { Text(label) }
+                        label = { Text(label) },
+                        leadingIcon = if (type == "Smart") {
+                            { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        } else null
                     )
                 }
             }
@@ -220,6 +249,27 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+                    if (smartInput.isBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    stringResource(R.string.create_smart_recommendation),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
                 "Text" -> GeneratorField(textInput, { textInput = it }, stringResource(R.string.text_input_label), fieldError("text"))
                 "URL" -> GeneratorField(urlInput, { urlInput = it }, stringResource(R.string.url_input_label), fieldError("URL"), KeyboardType.Uri, true)
@@ -307,6 +357,13 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                 Text(localizedDomainMessage(context, it) ?: it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.height(16.dp))
+            QrReadinessCard(
+                isValid = validation.isValid && payloadError == null,
+                colorsReliable = colorAssessment.isReliable,
+                byteCount = encodedContent.toByteArray(Charsets.UTF_8).size,
+                typeLabel = payloadTypeLabel(payload.type)
+            )
+            Spacer(Modifier.height(12.dp))
             operationError?.let { message ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -427,6 +484,60 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrReadinessCard(
+    isValid: Boolean,
+    colorsReliable: Boolean,
+    byteCount: Int,
+    typeLabel: String
+) {
+    val ready = isValid && colorsReliable
+    val title = when {
+        !isValid -> stringResource(R.string.qr_needs_input)
+        !colorsReliable -> stringResource(R.string.qr_fix_colors)
+        else -> stringResource(R.string.qr_ready)
+    }
+    val quality = when {
+        byteCount > 1_200 -> stringResource(R.string.qr_quality_dense)
+        byteCount > 450 -> stringResource(R.string.qr_quality_good)
+        else -> stringResource(R.string.qr_quality_excellent)
+    }
+    val accent = if (ready) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = if (ready) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+        }
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                if (ready) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = accent
+            )
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.qr_readiness_title), style = MaterialTheme.typography.labelMedium, color = accent)
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                if (isValid) {
+                    Text(
+                        stringResource(R.string.qr_payload_size, byteCount, "$typeLabel · $quality"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

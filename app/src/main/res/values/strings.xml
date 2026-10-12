@@ -5,8 +5,23 @@
     <string name="nav_create">Create</string>
     <string name="nav_history">History</string>
     <string name="nav_settings">Settings</string>
+    <string name="privacy_on_device">On-device &amp; private</string>
+    <string name="scanner_aim_hint">Align a QR code inside the frame</string>
+    <string name="create_title">Create</string>
+    <string name="create_subtitle">Turn anything into a reliable QR code</string>
+    <string name="create_choose_type">Choose a format</string>
+    <string name="create_smart_recommendation">Smart mode recognizes links, contact details, and structured QR data automatically.</string>
+    <string name="qr_readiness_title">QR readiness</string>
+    <string name="qr_ready">Ready to generate</string>
+    <string name="qr_needs_input">Complete the highlighted fields</string>
+    <string name="qr_fix_colors">Choose a higher-contrast color pair</string>
+    <string name="qr_payload_size">%1$d bytes · %2$s</string>
+    <string name="qr_quality_excellent">Excellent reliability</string>
+    <string name="qr_quality_good">Good reliability</string>
+    <string name="qr_quality_dense">Dense code — keep it large</string>
 
     <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">Make the scanner feel like yours</string>
     <string name="settings_appearance">Appearance</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
@@ -17,6 +32,9 @@
     <string name="scan_sound">Scan sound</string>
     <string name="scan_sound_description">Play a confirmation sound after a successful scan</string>
     <string name="settings_privacy">Privacy</string>
+    <string name="privacy_center_title">Privacy by design</string>
+    <string name="privacy_center_description">Scanning and QR generation happen on your device. There are no ads, trackers, or account requirements.</string>
+    <string name="privacy_sensitive_note">Sensitive QR types are never added to history.</string>
     <string name="save_history">Save to history</string>
     <string name="save_history_description">Save non-sensitive scans and generated codes. Wi-Fi, contacts, email, phone, and SMS are always excluded.</string>
     <string name="settings_about">About</string>
@@ -35,6 +53,8 @@
     <string name="copyright">© 2026 Aarav Khanal. All rights reserved.</string>
 
     <string name="history_title">History</string>
+    <string name="history_subtitle_empty">Your private, local activity</string>
+    <string name="history_subtitle_count">%1$d items saved locally</string>
     <string name="history_search">Search history</string>
     <string name="history_clear_search">Clear search</string>
     <string name="history_clear">Clear history</string>
@@ -91,6 +111,8 @@
     <string name="switch_camera">Switch camera</string>
     <string name="try_camera_again">Try camera again</string>
     <string name="scanned_result">Scanned result</string>
+    <string name="result_format">%1$s · %2$s</string>
+    <string name="sensitive_result_not_saved">Private result — this type is not saved to history</string>
     <string name="dismiss_result">Dismiss result and resume scanning</string>
     <string name="copy">Copy</string>
     <string name="share">Share</string>

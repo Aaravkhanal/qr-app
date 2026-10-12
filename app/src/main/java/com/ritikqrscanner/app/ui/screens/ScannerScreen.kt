@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
@@ -32,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalDensity
@@ -51,12 +54,14 @@ import com.ritikqrscanner.app.data.SettingsManager
 import com.ritikqrscanner.app.domain.qr.QrAction
 import com.ritikqrscanner.app.domain.qr.QrActionResolver
 import com.ritikqrscanner.app.domain.qr.QrPayloadParser
+import com.ritikqrscanner.app.domain.qr.QrPayloadType
 import com.ritikqrscanner.app.scanner.GalleryDecodeException
 import com.ritikqrscanner.app.scanner.ScanFeedback
 import com.ritikqrscanner.app.scanner.ScanSessionGate
 import com.ritikqrscanner.app.scanner.decodeGalleryBarcode
 import com.ritikqrscanner.app.ui.label
 import com.ritikqrscanner.app.ui.launchQrAction
+import com.ritikqrscanner.app.ui.PrivacyPill
 import com.ritikqrscanner.app.viewmodel.MainViewModel
 import com.ritikqrscanner.app.BuildConfig
 import com.ritikqrscanner.app.R
@@ -254,23 +259,25 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                     Box(Modifier.fillMaxSize().background(Color.Black))
                 }
 
-                // Animated scan line overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 48.dp, vertical = 80.dp)
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .align(Alignment.TopStart)
-                            .offset(y = (scanLineY * 300).dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                shape = RoundedCornerShape(1.dp)
-                            )
-                    )
+                    PrivacyPill(label = stringResource(R.string.privacy_on_device))
+                    Spacer(Modifier.height(14.dp))
+                    ScannerViewfinder(scanLineY)
+                    Spacer(Modifier.height(14.dp))
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.62f),
+                        shape = CircleShape,
+                        contentColor = Color.White
+                    ) {
+                        Text(
+                            stringResource(R.string.scanner_aim_hint),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
                 }
 
                 // Controls Overlay
@@ -371,6 +378,43 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
+private fun ScannerViewfinder(scanLineY: Float) {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.72f)
+            .sizeIn(maxWidth = 280.dp)
+            .aspectRatio(1f)
+            .background(Color.Black.copy(alpha = 0.08f), RoundedCornerShape(28.dp))
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val inset = 3.dp.toPx()
+            val corner = 42.dp.toPx()
+            val stroke = 5.dp.toPx()
+            val right = size.width - inset
+            val bottom = size.height - inset
+
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(inset, corner), end = androidx.compose.ui.geometry.Offset(inset, inset), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(inset, inset), end = androidx.compose.ui.geometry.Offset(corner, inset), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(right - corner, inset), end = androidx.compose.ui.geometry.Offset(right, inset), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(right, inset), end = androidx.compose.ui.geometry.Offset(right, corner), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(inset, bottom - corner), end = androidx.compose.ui.geometry.Offset(inset, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(inset, bottom), end = androidx.compose.ui.geometry.Offset(corner, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(right - corner, bottom), end = androidx.compose.ui.geometry.Offset(right, bottom), strokeWidth = stroke, cap = StrokeCap.Round)
+            drawLine(primary, start = androidx.compose.ui.geometry.Offset(right, bottom), end = androidx.compose.ui.geometry.Offset(right, bottom - corner), strokeWidth = stroke, cap = StrokeCap.Round)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .height(2.dp)
+                .offset(y = (18 + scanLineY * 242).dp)
+                .background(primary.copy(alpha = 0.92f), CircleShape)
+        )
+    }
+}
+
+@Composable
 internal fun CameraPermissionContent(
     permanentlyDenied: Boolean,
     onTryAgain: () -> Unit,
@@ -449,6 +493,44 @@ private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: 
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape
+            ) {
+                Text(
+                    stringResource(R.string.result_format, payloadTypeLabel(payload.type), barcodeFormat),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            if (payload.type in setOf(
+                    QrPayloadType.WIFI,
+                    QrPayloadType.VCARD,
+                    QrPayloadType.EMAIL,
+                    QrPayloadType.PHONE,
+                    QrPayloadType.SMS
+                )
+            ) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        stringResource(R.string.sensitive_result_not_saved),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Text(result, style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(14.dp))

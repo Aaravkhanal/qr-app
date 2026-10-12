@@ -3,111 +3,149 @@ package com.ritikqrscanner.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.*
-import com.ritikqrscanner.app.ui.screens.*
-
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.ritikqrscanner.app.data.SettingsManager
-import com.ritikqrscanner.app.R
+import com.ritikqrscanner.app.ui.QrAppTheme
+import com.ritikqrscanner.app.ui.screens.GeneratorScreen
+import com.ritikqrscanner.app.ui.screens.HistoryScreen
+import com.ritikqrscanner.app.ui.screens.ScannerScreen
+import com.ritikqrscanner.app.ui.screens.SettingsScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
             val settingsManager = remember { SettingsManager(context) }
             val themeMode by settingsManager.themeModeFlow.collectAsState(initial = 2)
-
             val isDarkTheme = when (themeMode) {
                 0 -> false
                 1 -> true
-                else -> isSystemInDarkTheme()
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
             }
 
-            val darkColors = darkColorScheme(
-                background = androidx.compose.ui.graphics.Color(0xFF000000),
-                surface = androidx.compose.ui.graphics.Color(0xFF161A1D),
-                surfaceVariant = androidx.compose.ui.graphics.Color(0xFF1F2429),
-                primary = androidx.compose.ui.graphics.Color(0xFF90C2F9),
-                onPrimary = androidx.compose.ui.graphics.Color(0xFF000000)
-            )
-
-            val lightColors = lightColorScheme(
-                background = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-                surface = androidx.compose.ui.graphics.Color(0xFFF7F9FC),
-                surfaceVariant = androidx.compose.ui.graphics.Color(0xFFE9EEF5),
-                primary = androidx.compose.ui.graphics.Color(0xFF006494),
-                onPrimary = androidx.compose.ui.graphics.Color(0xFFFFFFFF)
-            )
-
-            MaterialTheme(
-                colorScheme = if (isDarkTheme) darkColors else lightColors
-            ) {
+            QrAppTheme(darkTheme = isDarkTheme) {
                 ModernQRApp()
             }
         }
     }
 }
 
+private data class AppDestination(val route: String, val label: Int, val icon: ImageVector)
+
+private val appDestinations = listOf(
+    AppDestination("scanner", R.string.nav_scan, Icons.Default.QrCodeScanner),
+    AppDestination("generator", R.string.nav_create, Icons.Default.QrCode2),
+    AppDestination("history", R.string.nav_history, Icons.AutoMirrored.Filled.List),
+    AppDestination("settings", R.string.nav_settings, Icons.Default.Tune)
+)
+
 @Composable
 fun ModernQRApp() {
     val navController = rememberNavController()
-    Scaffold(
-        bottomBar = { BottomNavigationBar(navController) }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = "scanner",
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable("scanner") { ScannerScreen() }
-            composable("generator") { GeneratorScreen() }
-            composable("history") { HistoryScreen() }
-            composable("settings") { SettingsScreen() }
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        if (maxWidth >= 700.dp) {
+            Row(Modifier.fillMaxSize()) {
+                AppNavigationRail(navController)
+                AppNavHost(navController, Modifier.weight(1f))
+            }
+        } else {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                bottomBar = { BottomNavigationBar(navController) }
+            ) { innerPadding ->
+                AppNavHost(navController, Modifier.padding(innerPadding))
+            }
         }
     }
 }
 
 @Composable
+private fun AppNavHost(navController: NavHostController, modifier: Modifier = Modifier) {
+    NavHost(navController = navController, startDestination = "scanner", modifier = modifier) {
+        composable("scanner") { ScannerScreen() }
+        composable("generator") { GeneratorScreen() }
+        composable("history") { HistoryScreen() }
+        composable("settings") { SettingsScreen() }
+    }
+}
+
+@Composable
 fun BottomNavigationBar(navController: NavHostController) {
-    val items = listOf("scanner", "generator", "history", "settings")
-    val icons = listOf(Icons.Default.Search, Icons.Default.Create, Icons.AutoMirrored.Filled.List, Icons.Default.Settings)
-    val labels = listOf(
-        stringResource(R.string.nav_scan),
-        stringResource(R.string.nav_create),
-        stringResource(R.string.nav_history),
-        stringResource(R.string.nav_settings)
-    )
-
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    NavigationBar {
-        items.forEachIndexed { index, screen ->
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+        appDestinations.forEach { destination ->
+            val label = stringResource(destination.label)
             NavigationBarItem(
-                icon = { Icon(icons[index], contentDescription = labels[index]) },
-                label = { Text(labels[index]) },
-                selected = currentRoute == screen,
-                onClick = {
-                    navController.navigate(screen) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
+                icon = { Icon(destination.icon, contentDescription = label) },
+                label = { Text(label) },
+                selected = currentRoute == destination.route,
+                onClick = { navController.navigateTo(destination.route) }
             )
         }
+    }
+}
+
+@Composable
+private fun AppNavigationRail(navController: NavHostController) {
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+        appDestinations.forEach { destination ->
+            val label = stringResource(destination.label)
+            NavigationRailItem(
+                icon = { Icon(destination.icon, contentDescription = label) },
+                label = { Text(label) },
+                selected = currentRoute == destination.route,
+                onClick = { navController.navigateTo(destination.route) },
+                alwaysShowLabel = true
+            )
+        }
+    }
+}
+
+private fun NavHostController.navigateTo(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

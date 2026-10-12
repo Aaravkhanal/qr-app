@@ -7,6 +7,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,8 +23,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.ritikqrscanner.app.data.SettingsManager
 import com.ritikqrscanner.app.R
+import com.ritikqrscanner.app.ui.ScreenHeader
 import kotlinx.coroutines.launch
 
 @Composable
@@ -38,24 +47,51 @@ fun SettingsScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Header
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 2.dp
+        ScreenHeader(
+            title = stringResource(R.string.settings_title),
+            subtitle = stringResource(R.string.settings_subtitle),
+            icon = Icons.Default.Settings
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
         ) {
-            Text(
-                text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(16.dp)
-            )
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(28.dp)
+                )
+                Column {
+                    Text(
+                        stringResource(R.string.privacy_center_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.privacy_center_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.privacy_sensitive_note),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Theme Selection
-        SettingsSection(title = stringResource(R.string.settings_appearance)) {
+        SettingsSection(title = stringResource(R.string.settings_appearance), icon = Icons.Default.Palette) {
             val themeOptions = listOf(
                 stringResource(R.string.theme_light),
                 stringResource(R.string.theme_dark),
@@ -85,7 +121,7 @@ fun SettingsScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         // Scanner Behavior
-        SettingsSection(title = stringResource(R.string.settings_scanner)) {
+        SettingsSection(title = stringResource(R.string.settings_scanner), icon = Icons.Default.QrCodeScanner) {
             // Haptic Feedback toggle
             Row(
                 modifier = Modifier
@@ -145,7 +181,7 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        SettingsSection(title = stringResource(R.string.settings_privacy)) {
+        SettingsSection(title = stringResource(R.string.settings_privacy), icon = Icons.Default.Shield) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -176,7 +212,7 @@ fun SettingsScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         // About
-        SettingsSection(title = stringResource(R.string.settings_about)) {
+        SettingsSection(title = stringResource(R.string.settings_about), icon = Icons.Default.Info) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 SettingsInfoRow(label = stringResource(R.string.developer), value = stringResource(R.string.developer_name))
                 Spacer(modifier = Modifier.height(10.dp))
@@ -266,7 +302,7 @@ fun SettingsScreen() {
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsSection(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,13 +310,19 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             content()
         }
     }
