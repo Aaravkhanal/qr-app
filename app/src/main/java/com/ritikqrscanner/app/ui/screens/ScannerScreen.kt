@@ -509,7 +509,7 @@ private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: 
                     QrPayloadType.WIFI,
                     QrPayloadType.VCARD,
                     QrPayloadType.EMAIL,
-                    QrPayloadType.PHONE,
+                    QrPayloadType.TELEPHONE,
                     QrPayloadType.SMS
                 )
             ) {
