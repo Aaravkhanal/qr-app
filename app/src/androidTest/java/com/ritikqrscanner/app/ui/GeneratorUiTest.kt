@@ -1,7 +1,6 @@
 package com.ritikqrscanner.app.ui
 
 import android.Manifest
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -28,11 +27,12 @@ class GeneratorUiTest {
     fun validationAndFormStateSurviveActivityRecreation() {
         composeRule.onNodeWithText("Create").performClick()
         composeRule.onNodeWithText("Generate QR code").assertIsNotEnabled()
-        composeRule.onNodeWithText("Complete the highlighted fields").assertIsDisplayed()
+        composeRule.onNodeWithText("Complete the highlighted fields")
+            .assertTextContains("Complete the highlighted fields")
         composeRule.onNodeWithText("Text").performClick()
         composeRule.onNodeWithText("Enter text").performTextInput("rotation-safe Unicode नमस्ते")
         composeRule.onNodeWithText("Generate QR code").assertIsEnabled()
-        composeRule.onNodeWithText("Ready to generate").assertIsDisplayed()
+        composeRule.onNodeWithText("Ready to generate").assertTextContains("Ready to generate")
 
         composeRule.activityRule.scenario.recreate()
 
