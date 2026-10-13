@@ -66,6 +66,11 @@ jobs:
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
 
+    - name: Free space for the Android emulator
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo apt-get clean
+
     - name: Run instrumentation tests on API 29
       uses: ReactiveCircus/android-emulator-runner@v2
       with:
