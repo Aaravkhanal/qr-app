@@ -29,6 +29,7 @@ class HistoryUiTest {
 
     @Test
     fun individualDeletionAndClearHistoryRequireConfirmation() {
+        composeRule.dismissOnboardingIfShown()
         val dao = AppDatabase.getDatabase(composeRule.activity).historyDao()
         runBlocking {
             dao.clearHistory()

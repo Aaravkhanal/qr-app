@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -39,10 +40,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ritikqrscanner.app.data.SettingsManager
 import com.ritikqrscanner.app.ui.QrAppTheme
+import com.ritikqrscanner.app.ui.OnboardingDialog
 import com.ritikqrscanner.app.ui.screens.GeneratorScreen
 import com.ritikqrscanner.app.ui.screens.HistoryScreen
 import com.ritikqrscanner.app.ui.screens.ScannerScreen
 import com.ritikqrscanner.app.ui.screens.SettingsScreen
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,6 +55,8 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val settingsManager = remember { SettingsManager(context) }
             val themeMode by settingsManager.themeModeFlow.collectAsState(initial = 2)
+            val onboardingComplete by settingsManager.onboardingCompleteFlow.collectAsState(initial = true)
+            val scope = rememberCoroutineScope()
             val isDarkTheme = when (themeMode) {
                 0 -> false
                 1 -> true
@@ -60,6 +65,11 @@ class MainActivity : ComponentActivity() {
 
             QrAppTheme(darkTheme = isDarkTheme) {
                 ModernQRApp()
+                if (!onboardingComplete) {
+                    OnboardingDialog(
+                        onComplete = { scope.launch { settingsManager.setOnboardingComplete(true) } }
+                    )
+                }
             }
         }
     }

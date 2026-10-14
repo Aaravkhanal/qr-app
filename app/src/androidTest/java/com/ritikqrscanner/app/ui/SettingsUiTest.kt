@@ -27,6 +27,7 @@ class SettingsUiTest {
 
     @Test
     fun themeSelectionUpdatesUiAndPersists() {
+        composeRule.dismissOnboardingIfShown()
         composeRule.onNodeWithText("Settings").performClick()
         composeRule.onNodeWithText("Dark").performClick()
 

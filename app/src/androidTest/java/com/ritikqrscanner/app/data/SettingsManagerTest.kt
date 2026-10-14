@@ -21,17 +21,25 @@ class SettingsManagerTest {
         first.setScanSound(false)
         first.setHapticFeedback(false)
         first.setSaveHistory(false)
+        first.setReduceMotion(true)
+        first.setOnboardingComplete(true)
 
         val restored = SettingsManager(context)
         assertEquals(1, restored.themeModeFlow.first())
         assertFalse(restored.scanSoundFlow.first())
         assertFalse(restored.hapticFeedbackFlow.first())
         assertFalse(restored.saveHistoryFlow.first())
+        assertTrue(restored.reduceMotionFlow.first())
+        assertTrue(restored.onboardingCompleteFlow.first())
 
         restored.setThemeMode(2)
         restored.setScanSound(true)
         restored.setHapticFeedback(true)
         restored.setSaveHistory(true)
+        restored.setReduceMotion(false)
+        restored.setOnboardingComplete(false)
         assertTrue(first.saveHistoryFlow.first())
+        assertFalse(first.reduceMotionFlow.first())
+        assertFalse(first.onboardingCompleteFlow.first())
     }
 }

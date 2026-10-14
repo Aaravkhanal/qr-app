@@ -25,6 +25,7 @@ class GeneratorUiTest {
 
     @Test
     fun validationAndFormStateSurviveActivityRecreation() {
+        composeRule.dismissOnboardingIfShown()
         composeRule.onNodeWithText("Create").performClick()
         composeRule.onNodeWithText("Generate QR code").assertIsNotEnabled()
         composeRule.onNodeWithText("Complete the highlighted fields")

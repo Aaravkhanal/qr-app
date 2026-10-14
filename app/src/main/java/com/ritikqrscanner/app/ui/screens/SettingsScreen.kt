@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ fun SettingsScreen() {
     val hapticEnabled by settingsManager.hapticFeedbackFlow.collectAsState(initial = true)
     val soundEnabled by settingsManager.scanSoundFlow.collectAsState(initial = true)
     val saveHistoryEnabled by settingsManager.saveHistoryFlow.collectAsState(initial = true)
+    val reduceMotionEnabled by settingsManager.reduceMotionFlow.collectAsState(initial = false)
 
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
@@ -177,6 +179,35 @@ fun SettingsScreen() {
                     onCheckedChange = null
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SettingsSection(title = stringResource(R.string.settings_accessibility), icon = Icons.Default.AccessibilityNew) {
+            Row(
+                modifier = Modifier.fillMaxWidth().toggleable(
+                    value = reduceMotionEnabled,
+                    role = Role.Switch,
+                    onValueChange = { coroutineScope.launch { settingsManager.setReduceMotion(it) } }
+                ).padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.reduce_motion), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.reduce_motion_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = reduceMotionEnabled, onCheckedChange = null)
+            }
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+            TextButton(
+                onClick = { coroutineScope.launch { settingsManager.setOnboardingComplete(false) } },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            ) { Text(stringResource(R.string.show_intro_again)) }
         }
 
         Spacer(modifier = Modifier.height(8.dp))

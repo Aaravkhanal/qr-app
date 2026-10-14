@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -77,6 +78,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
     val settingsManager = remember { SettingsManager(context) }
     val hapticEnabled by settingsManager.hapticFeedbackFlow.collectAsState(initial = true)
     val soundEnabled by settingsManager.scanSoundFlow.collectAsState(initial = true)
+    val reduceMotion by settingsManager.reduceMotionFlow.collectAsState(initial = false)
     val currentHapticEnabled by rememberUpdatedState(hapticEnabled)
     val currentSoundEnabled by rememberUpdatedState(soundEnabled)
     val feedback = remember { ScanFeedback(context) }
@@ -210,15 +212,19 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 
         // Animated scan line
         val infiniteTransition = rememberInfiniteTransition(label = "scan_line")
-        val scanLineY by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2000, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "scan_line_y"
-        )
+        val scanLineY by if (reduceMotion) {
+            remember { mutableFloatStateOf(0.5f) }
+        } else {
+            infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scan_line_y"
+            )
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -600,6 +606,12 @@ private fun ScannedResultCard(result: String, barcodeFormat: String, onDismiss: 
                     onClick = { resultMessage = launchQrAction(context, action) },
                     modifier = Modifier.fillMaxWidth()
                 ) { Text(action.label(context)) }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.scan_another))
             }
         }
     }

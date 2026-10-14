@@ -14,6 +14,8 @@ class SettingsManager(private val context: Context) {
         val SCAN_SOUND = booleanPreferencesKey("scan_sound")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback")
         val SAVE_HISTORY = booleanPreferencesKey("save_history")
+        val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+        val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
     }
 
     val themeModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -30,6 +32,14 @@ class SettingsManager(private val context: Context) {
 
     val saveHistoryFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[SAVE_HISTORY] ?: true
+    }
+
+    val onboardingCompleteFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ONBOARDING_COMPLETE] ?: false
+    }
+
+    val reduceMotionFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[REDUCE_MOTION] ?: false
     }
 
     suspend fun setThemeMode(mode: Int) {
@@ -54,5 +64,13 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[SAVE_HISTORY] = enabled
         }
+    }
+
+    suspend fun setOnboardingComplete(complete: Boolean) {
+        context.dataStore.edit { preferences -> preferences[ONBOARDING_COMPLETE] = complete }
+    }
+
+    suspend fun setReduceMotion(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[REDUCE_MOTION] = enabled }
     }
 }

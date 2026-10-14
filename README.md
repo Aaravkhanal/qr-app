@@ -16,6 +16,8 @@ A fast, modern, and completely ad-free QR Scanner and Barcode Reader built nativ
 - **History Management**: Optionally save non-sensitive scans and generated codes. Consecutive duplicates are skipped, and sensitive Wi-Fi, contact, email, phone, and SMS payloads are excluded.
 - **No Ads, No Trackers**: 100% privacy-focused.
 - **Fully Offline**: Does not require an internet connection to scan and decode.
+- **Friendly First Run**: A concise welcome tour explains scanning, creation, and the app's privacy model.
+- **Accessible Motion**: Scanner animation can be disabled while keeping the full scanning experience.
 
 ## 📸 Screenshots
 
@@ -96,6 +98,15 @@ The main CI workflow runs instrumentation tests on API 29. The manually triggere
 Matrix** workflow runs the same suite on APIs 24, 28, 29, 30, 33, and 36 with no front camera. The
 emulator also provides the no-hardware-flash path. Compose tests exercise a 280 dp layout at 200%
 font scale, and payload tests include long, escaped, multiline, Unicode, and international values.
+
+## Release readiness
+
+Before publishing, run the manual Android Device Matrix workflow and verify one physical device in
+bright light and low light. Check camera permission denial/recovery, torch availability, camera
+switching, gallery scanning, large-font layouts, dark/light themes, save/share destinations, and a
+signed bundle install. Store screenshots must use synthetic QR contents and must not show personal
+history. Dependency updates are monitored through Dependabot; suspected vulnerabilities should be
+reported using the private process in `SECURITY.md`.
 
 ### Release Signing
 
