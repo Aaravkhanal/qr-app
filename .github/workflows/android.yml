@@ -102,7 +102,10 @@ jobs:
         pre-emulator-launch-script: |
           sed -i '/^disk.dataPartition.size=/d' "$HOME/.android/avd/test.avd/config.ini"
           printf '%s\n' 'disk.dataPartition.size=4096M' >> "$HOME/.android/avd/test.avd/config.ini"
-        script: ./gradlew connectedDebugAndroidTest
+        script: |
+          ./gradlew connectedDebugAndroidTest
+          mkdir -p captured-screenshots
+          adb pull /sdcard/Android/data/com.ritikqrscanner.app/files/Pictures/app-screenshots/. captured-screenshots/
 
     - name: Upload instrumentation reports
       if: always()
@@ -113,4 +116,12 @@ jobs:
           app/build/reports/androidTests/
           app/build/outputs/androidTest-results/
         if-no-files-found: warn
+        retention-days: 14
+
+    - name: Upload current app screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: current-app-screenshots
+        path: captured-screenshots/
+        if-no-files-found: error
         retention-days: 14
