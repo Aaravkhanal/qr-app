@@ -106,9 +106,14 @@ class AppScreenshotTest {
         )
         assertTrue(directory.exists() || directory.mkdirs())
         val screenshot = instrumentation.uiAutomation.takeScreenshot()
-        File(directory, name).outputStream().use { output ->
+        val file = File(directory, name)
+        file.outputStream().use { output ->
             assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output))
         }
         screenshot.recycle()
+        instrumentation.uiAutomation.executeShellCommand(
+            "mkdir -p /sdcard/Download/app-screenshots && " +
+                "cp '${file.absolutePath}' '/sdcard/Download/app-screenshots/$name'"
+        ).close()
     }
 }

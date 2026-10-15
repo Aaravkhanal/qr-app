@@ -43,7 +43,7 @@ jobs:
         script: |
           ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.ritikqrscanner.app.ui.AppScreenshotTest
           mkdir -p captured-screenshots
-          adb pull /sdcard/Android/data/com.ritikqrscanner.app/files/Pictures/app-screenshots/. captured-screenshots/
+          adb pull /sdcard/Download/app-screenshots/. captured-screenshots/
     - name: Upload screenshots
       uses: actions/upload-artifact@v4
       with:
