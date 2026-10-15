@@ -4,7 +4,9 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.Environment
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -44,8 +46,9 @@ class AppScreenshotTest {
         composeRule.onNodeWithText("Enter text").performTextInput("Private, fast, and made on-device")
         composeRule.onNodeWithText("Generate QR code").performClick()
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("Share").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithContentDescription("Generated QR code").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithContentDescription("Generated QR code").performScrollTo()
         capture("03-create-light.png")
 
         composeRule.onNodeWithText("History").performClick()
