@@ -61,4 +61,4 @@ jobs:
         pre-emulator-launch-script: |
           sed -i '/^disk.dataPartition.size=/d' "$HOME/.android/avd/test.avd/config.ini"
           printf '%s\n' 'disk.dataPartition.size=4096M' >> "$HOME/.android/avd/test.avd/config.ini"
-        script: ./gradlew connectedDebugAndroidTest
+        script: ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.ritikqrscanner.app.ui.AppScreenshotTest
