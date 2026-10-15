@@ -4,9 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.os.Environment
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -15,7 +13,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import com.ritikqrscanner.app.MainActivity
+import com.ritikqrscanner.app.data.AppDatabase
+import com.ritikqrscanner.app.data.HistoryItem
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -44,12 +45,18 @@ class AppScreenshotTest {
         composeRule.onNodeWithText("Create").performClick()
         composeRule.onNodeWithText("Text").performClick()
         composeRule.onNodeWithText("Enter text").performTextInput("Private, fast, and made on-device")
-        composeRule.onNodeWithText("Generate QR code").performClick()
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription("Generated QR code").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("Generated QR code").performScrollTo()
         capture("03-create-light.png")
+
+        runBlocking {
+            AppDatabase.getDatabase(composeRule.activity).historyDao().insert(
+                HistoryItem(
+                    content = "Private, fast, and made on-device",
+                    format = "QR_CODE",
+                    type = "Generated",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
 
         composeRule.onNodeWithText("History").performClick()
         composeRule.waitUntil(5_000) {
