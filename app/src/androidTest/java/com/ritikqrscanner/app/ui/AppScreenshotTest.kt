@@ -112,11 +112,13 @@ class AppScreenshotTest {
             assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output))
         }
         screenshot.recycle()
-        val exportCommand =
-            "mkdir -p /sdcard/Download/app-screenshots && " +
-                "screencap -p '/sdcard/Download/app-screenshots/$name'"
+        executeShellCommand("mkdir -p /sdcard/Download/app-screenshots")
+        executeShellCommand("screencap -p /sdcard/Download/app-screenshots/$name")
+    }
+
+    private fun executeShellCommand(command: String) {
         ParcelFileDescriptor.AutoCloseInputStream(
-            instrumentation.uiAutomation.executeShellCommand(exportCommand)
+            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
         ).use { it.readBytes() }
     }
 }
