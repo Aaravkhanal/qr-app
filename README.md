@@ -21,22 +21,32 @@ A fast, modern, and completely ad-free QR Scanner and Barcode Reader built nativ
 
 ## 📸 Screenshots
 
+These are current, automated captures from the real app running on the API 29 CI emulator. The
+scanner preview uses the emulator's synthetic camera feed; a physical device shows the live camera.
+
+### Welcome
+
+<p align="center">
+  <img src="screenshots/01-welcome-light.png" width="240" alt="QR Scanner welcome tour">
+</p>
+
 ### Light Theme
-| Scanner | Result | History | Settings |
+
+| Scanner | Create | History | Settings |
 | :---: | :---: | :---: | :---: |
-| <img src="screenshots/1 white theme.png" width="200" alt="Scanner Light"> | <img src="screenshots/2 white theme.png" width="200" alt="Result Light"> | <img src="screenshots/3 white theme.png" width="200" alt="History Light"> | <img src="screenshots/4 white theme.png" width="200" alt="Settings Light"> |
+| <img src="screenshots/02-scanner-light.png" width="200" alt="Scanner in light theme"> | <img src="screenshots/03-create-light.png" width="200" alt="QR creator in light theme"> | <img src="screenshots/04-history-light.png" width="200" alt="Local history in light theme"> | <img src="screenshots/05-settings-light.png" width="200" alt="Settings in light theme"> |
 
 ### Dark Theme
-| Scanner | Result | History | Settings |
+
+| Scanner | Create | History | Settings |
 | :---: | :---: | :---: | :---: |
-| <img src="screenshots/1.png" width="200" alt="Scanner Dark"> | <img src="screenshots/2.png" width="200" alt="Result Dark"> | <img src="screenshots/3.png" width="200" alt="History Dark"> | <img src="screenshots/4.png" width="200" alt="Settings Dark"> |
+| <img src="screenshots/07-scanner-dark.png" width="200" alt="Scanner in dark theme"> | <img src="screenshots/08-create-dark.png" width="200" alt="QR creator in dark theme"> | <img src="screenshots/09-history-dark.png" width="200" alt="Local history in dark theme"> | <img src="screenshots/06-settings-dark.png" width="200" alt="Settings in dark theme"> |
 
 ## 💻 Tech Stack
 - **Language**: Kotlin
 - **UI Framework**: Jetpack Compose & Material Design 3
 - **Database**: Room (SQLite) & Jetpack DataStore (Preferences)
 - **Architecture**: MVVM, Compose Navigation
-- **Image Loading**: Coil
 - **QR Core Engine**: ZXing (Zebra Crossing)
 
 ## 🛠️ How to Build from Source
@@ -98,6 +108,8 @@ The main CI workflow runs instrumentation tests on API 29. The manually triggere
 Matrix** workflow runs the same suite on APIs 24, 28, 29, 30, 33, and 36 with no front camera. The
 emulator also provides the no-hardware-flash path. Compose tests exercise a 280 dp layout at 200%
 font scale, and payload tests include long, escaped, multiline, Unicode, and international values.
+The **Current App Screenshots** workflow launches the app on API 29 and exports the README gallery,
+so documentation images can be regenerated from the current UI instead of edited by hand.
 
 ## Release readiness
 
