@@ -10,7 +10,8 @@ import com.ritikqrscanner.app.data.HistoryRepository
 import com.ritikqrscanner.app.data.SettingsManager
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -63,7 +64,7 @@ class MainViewModelTest {
             viewModel.clearHistory().join()
             assertTrue(database.historyDao().getAllOnce().isEmpty())
         } finally {
-            viewModel.viewModelScope.cancel()
+            viewModel.viewModelScope.coroutineContext[Job]?.cancelAndJoin()
             database.close()
         }
     }
