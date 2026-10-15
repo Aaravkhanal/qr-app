@@ -3,7 +3,7 @@ package com.ritikqrscanner.app.ui
 import android.Manifest
 import android.graphics.Bitmap
 import android.os.Environment
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -34,11 +34,11 @@ class AppScreenshotTest {
         openSettings()
         composeRule.onNodeWithText("Light").performClick()
         composeRule.onNodeWithText("Show welcome tour again").performScrollTo().performClick()
-        composeRule.onNodeWithText("Scan in a moment").assertExists()
+        composeRule.onNodeWithText("Scan in a moment").assertIsDisplayed()
         capture("01-welcome-light.png")
 
         composeRule.onNodeWithText("Skip").performClick()
-        composeRule.onNodeWithText("Gallery").assertExists()
+        composeRule.onNodeWithText("Gallery").assertIsDisplayed()
         capture("02-scanner-light.png")
 
         composeRule.onNodeWithText("Create").performClick()
@@ -79,7 +79,7 @@ class AppScreenshotTest {
 
     private fun openSettings() {
         composeRule.onNodeWithText("Settings").performClick()
-        composeRule.onNodeWithText("Appearance").assertExists()
+        composeRule.onNodeWithText("Appearance").assertIsDisplayed()
     }
 
     private fun capture(name: String) {
