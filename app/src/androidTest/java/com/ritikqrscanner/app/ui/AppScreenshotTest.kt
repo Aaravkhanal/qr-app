@@ -3,6 +3,7 @@ package com.ritikqrscanner.app.ui
 import android.Manifest
 import android.graphics.Bitmap
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -111,9 +112,11 @@ class AppScreenshotTest {
             assertTrue(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output))
         }
         screenshot.recycle()
-        instrumentation.uiAutomation.executeShellCommand(
+        val exportCommand =
             "mkdir -p /sdcard/Download/app-screenshots && " +
-                "cp '${file.absolutePath}' '/sdcard/Download/app-screenshots/$name'"
-        ).close()
+                "screencap -p '/sdcard/Download/app-screenshots/$name'"
+        ParcelFileDescriptor.AutoCloseInputStream(
+            instrumentation.uiAutomation.executeShellCommand(exportCommand)
+        ).use { it.readBytes() }
     }
 }
