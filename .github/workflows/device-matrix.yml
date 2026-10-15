@@ -2,6 +2,20 @@ name: Android Device Matrix
 
 on:
   workflow_dispatch:
+    inputs:
+      api-level:
+        description: Android API level to test
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - '24'
+          - '28'
+          - '29'
+          - '30'
+          - '33'
+          - '36'
 
 permissions:
   contents: read
@@ -14,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [24, 28, 29, 30, 33, 36]
+        api-level: ${{ fromJSON(inputs.api-level == 'all' && '[24,28,29,30,33,36]' || format('[{0}]', inputs.api-level)) }}
 
     steps:
     - uses: actions/checkout@v5
