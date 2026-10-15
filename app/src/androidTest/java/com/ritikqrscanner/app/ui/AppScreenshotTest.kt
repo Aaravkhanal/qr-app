@@ -41,6 +41,7 @@ class AppScreenshotTest {
         capture("01-welcome-light.png")
 
         composeRule.onNodeWithText("Skip").performClick()
+        composeRule.onNodeWithText("Scan").performClick()
         capture("02-scanner-light.png")
 
         composeRule.onNodeWithText("Create").performClick()
