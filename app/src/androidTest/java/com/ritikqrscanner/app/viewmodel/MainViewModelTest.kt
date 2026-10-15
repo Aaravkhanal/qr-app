@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.lifecycle.viewModelScope
 import com.ritikqrscanner.app.data.AppDatabase
 import com.ritikqrscanner.app.data.HistoryRepository
 import com.ritikqrscanner.app.data.SettingsManager
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -61,6 +63,7 @@ class MainViewModelTest {
             viewModel.clearHistory().join()
             assertTrue(database.historyDao().getAllOnce().isEmpty())
         } finally {
+            viewModel.viewModelScope.cancel()
             database.close()
         }
     }
