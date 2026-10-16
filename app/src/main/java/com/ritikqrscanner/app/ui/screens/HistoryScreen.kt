@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,7 +65,7 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
             subtitle = if (historyCount == 0) {
                 stringResource(R.string.history_subtitle_empty)
             } else {
-                stringResource(R.string.history_subtitle_count, historyCount)
+                pluralStringResource(R.plurals.history_subtitle_count, historyCount, historyCount)
             },
             icon = Icons.AutoMirrored.Filled.List,
             action = if (historyCount > 0) {

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
 import android.provider.Settings
+import androidx.core.net.toUri
 import com.ritikqrscanner.app.domain.qr.QrAction
 import com.ritikqrscanner.app.domain.qr.WifiSecurity
 import com.ritikqrscanner.app.R
@@ -22,7 +23,7 @@ internal fun launchQrAction(
     val prepared = when (action) {
         is QrAction.OpenUrl -> prepareWebUrl(context, action.url)
         is QrAction.OpenMap -> PreparedAction(
-            Intent(Intent.ACTION_VIEW, Uri.parse("geo:${action.latitude},${action.longitude}")),
+            Intent(Intent.ACTION_VIEW, "geo:${action.latitude},${action.longitude}".toUri()),
             unavailableMessage = context.getString(R.string.no_maps_app)
         )
         is QrAction.Dial -> PreparedAction(
@@ -79,7 +80,7 @@ fun QrAction.label(context: Context): String = when (this) {
 }
 
 private fun prepareWebUrl(context: Context, value: String): PreparedAction {
-    val uri = runCatching { Uri.parse(value) }.getOrNull()
+    val uri = value.toUri()
     val safeScheme = uri?.scheme?.lowercase() in setOf("http", "https")
     return if (uri != null && safeScheme && !uri.host.isNullOrBlank()) {
         PreparedAction(
@@ -101,7 +102,7 @@ private fun prepareEmail(context: Context, action: QrAction.SendEmail): Prepared
         if (action.body.isNotEmpty()) add("body=${Uri.encode(action.body)}")
     }.joinToString("&")
     val encodedRecipients = action.recipients.joinToString(",") { Uri.encode(it, "@") }
-    val data = Uri.parse("mailto:$encodedRecipients${if (query.isEmpty()) "" else "?$query"}")
+    val data = "mailto:$encodedRecipients${if (query.isEmpty()) "" else "?$query"}".toUri()
     return PreparedAction(
         Intent(Intent.ACTION_SENDTO, data).apply {
             putExtra(Intent.EXTRA_EMAIL, action.recipients.toTypedArray())

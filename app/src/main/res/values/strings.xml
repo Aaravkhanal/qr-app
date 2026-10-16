@@ -24,7 +24,10 @@
     <string name="qr_ready">Ready to generate</string>
     <string name="qr_needs_input">Complete the highlighted fields</string>
     <string name="qr_fix_colors">Choose a higher-contrast color pair</string>
-    <string name="qr_payload_size">%1$d bytes · %2$s</string>
+    <plurals name="qr_payload_size">
+        <item quantity="one">%1$d byte · %2$s</item>
+        <item quantity="other">%1$d bytes · %2$s</item>
+    </plurals>
     <string name="qr_quality_excellent">Excellent reliability</string>
     <string name="qr_quality_good">Good reliability</string>
     <string name="qr_quality_dense">Dense code — keep it large</string>
@@ -67,7 +70,10 @@
 
     <string name="history_title">History</string>
     <string name="history_subtitle_empty">Your private, local activity</string>
-    <string name="history_subtitle_count">%1$d items saved locally</string>
+    <plurals name="history_subtitle_count">
+        <item quantity="one">%1$d item saved locally</item>
+        <item quantity="other">%1$d items saved locally</item>
+    </plurals>
     <string name="history_search">Search history</string>
     <string name="history_clear_search">Clear search</string>
     <string name="history_clear">Clear history</string>

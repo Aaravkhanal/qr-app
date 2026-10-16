@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -533,7 +534,7 @@ private fun QrReadinessCard(
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 if (isValid) {
                     Text(
-                        stringResource(R.string.qr_payload_size, byteCount, "$typeLabel · $quality"),
+                        pluralStringResource(R.plurals.qr_payload_size, byteCount, byteCount, "$typeLabel · $quality"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -615,7 +616,6 @@ private suspend fun generateQrBitmap(content: String, foregroundArgb: Int, backg
 private suspend fun saveBitmapToDownloads(context: Context, bitmap: Bitmap, filename: String): Result<String> =
     withContext(Dispatchers.IO) {
         runCatching {
-            check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
             val resolver = context.contentResolver
             var uri: Uri? = null
             try {
