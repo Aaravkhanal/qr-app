@@ -45,7 +45,7 @@ jobs:
           mkdir -p captured-screenshots
           adb pull /sdcard/Download/app-screenshots/. captured-screenshots/
     - name: Upload screenshots
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: current-app-screenshots
         path: captured-screenshots/
