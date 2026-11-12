@@ -1,0 +1,8 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="scan" android:icon="@drawable/ic_launcher_foreground" android:shortcutShortLabel="@string/nav_scan">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ritikqrscanner.app" android:targetClass="com.ritikqrscanner.app.MainActivity" android:data="qrscanner://scan" />
+    </shortcut>
+    <shortcut android:shortcutId="create" android:icon="@drawable/ic_launcher_foreground" android:shortcutShortLabel="@string/nav_create">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ritikqrscanner.app" android:targetClass="com.ritikqrscanner.app.MainActivity" android:data="qrscanner://create" />
+    </shortcut>
+</shortcuts>

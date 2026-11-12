@@ -11,5 +11,7 @@ data class HistoryItem(
     val format: String,
     val type: String, // "Scanned" or "Generated"
     val timestamp: Long = System.currentTimeMillis(),
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "''") val name: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "''") val collection: String = ""
 )

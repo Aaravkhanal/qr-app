@@ -42,6 +42,7 @@ import com.ritikqrscanner.app.viewmodel.MainViewModel
 import com.ritikqrscanner.app.R
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +52,9 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
     val filterType by viewModel.filterType.collectAsState()
     val historyCount by viewModel.historyCount.collectAsState()
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var selectedCollection by rememberSaveable { mutableStateOf("All folders") }
+    var editing by remember { mutableStateOf<HistoryItem?>(null) }
+    val visibleItems = historyItems.filter { selectedCollection == "All folders" || it.collection == selectedCollection }
     var pendingDelete by remember { mutableStateOf<HistoryItem?>(null) }
     val filterOptions = listOf(
         "All" to stringResource(R.string.history_filter_all),
@@ -110,7 +114,12 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
         }
         Spacer(Modifier.height(8.dp))
 
-        if (historyItems.isEmpty()) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(listOf("All folders") + historyItems.map { it.collection }.filter { it.isNotBlank() }.distinct().sorted()) { folder ->
+                FilterChip(selected = selectedCollection == folder, onClick = { selectedCollection = folder }, label = { Text(folder) })
+            }
+        }
+        if (visibleItems.isEmpty()) {
             val hasSearch = searchQuery.isNotBlank()
             val isFiltered = filterType != "All"
             val emptyTitle = when {
@@ -157,9 +166,10 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(historyItems, key = { it.id }) { item ->
+                items(visibleItems, key = { it.id }) { item ->
                     HistoryItemCard(
                         item = item,
+                        onEdit = { editing = item },
                         onPin = { viewModel.updateHistoryItem(item.copy(isPinned = !item.isPinned)) },
                         onDelete = { pendingDelete = item }
                     )
@@ -168,6 +178,16 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
         }
     }
 
+    editing?.let { item ->
+        var name by remember(item.id) { mutableStateOf(item.name) }
+        var folder by remember(item.id) { mutableStateOf(item.collection) }
+        AlertDialog(onDismissRequest = { editing = null }, title = { Text("Organize code") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(folder, { folder = it }, label = { Text("Folder (Work, Personal, Events…)") }, singleLine = true)
+            }
+        }, confirmButton = { TextButton(onClick = { viewModel.updateHistoryItem(item.copy(name = name.trim(), collection = folder.trim())); editing = null }) { Text("Save") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } })
+    }
     if (showClearHistoryDialog) {
         AlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
@@ -207,8 +227,10 @@ fun HistoryScreen(viewModel: MainViewModel = viewModel()) {
 private fun HistoryItemCard(
     item: HistoryItem,
     onPin: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
+    val widgetScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val copyLabel = stringResource(R.string.copy)
@@ -271,6 +293,12 @@ private fun HistoryItemCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            if (item.name.isNotBlank()) Text(item.name, style = MaterialTheme.typography.titleMedium)
+            if (item.collection.isNotBlank()) Text(item.collection, style = MaterialTheme.typography.labelSmall)
+            Row {
+                TextButton(onClick = onEdit) { Text("Organize") }
+                TextButton(onClick = { widgetScope.launch { com.ritikqrscanner.app.widget.QrWidget.pin(context, item.content, item.name.ifBlank { "My QR" }) } }) { Text("Add widget") }
+            }
             // Content
             Text(
                 text = item.content,

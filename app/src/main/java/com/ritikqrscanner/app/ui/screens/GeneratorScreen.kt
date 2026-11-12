@@ -380,6 +380,8 @@ fun GeneratorScreen(viewModel: MainViewModel = viewModel()) {
                 }
                 Spacer(Modifier.height(12.dp))
             }
+            StudioPanel(encodedContent, foregroundArgb, backgroundArgb, validation.isValid && payloadError == null && colorAssessment.isReliable) { content -> viewModel.addHistoryItem(content, "QR_CODE", "Generated") }
+            Spacer(Modifier.height(16.dp))
             Button(
                 enabled = canGenerate,
                 onClick = {

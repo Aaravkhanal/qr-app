@@ -23,3 +23,6 @@ app/release.keystore
 App-logo-new.png
 feature_graphic.png
 play_store_icon.png
+
+# Android module build outputs
+/app/build/

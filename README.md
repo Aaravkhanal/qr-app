@@ -1,28 +1,78 @@
 # QR Scanner & Reader [No ADs]
 
-A fast, modern, and completely ad-free QR Scanner and Barcode Reader built natively for Android using Jetpack Compose. Designed with a minimal UI and smooth user experience, it features dynamic light and dark modes, system-confirmed Wi-Fi setup, and comprehensive history management.
+An ad-free Android app for scanning QR codes and barcodes, creating QR codes, and keeping optional local history. Scanning and generation run on your device, with no account required.
 
-## 🌟 Features
-- **Lightning Fast Scanning**: Instantly decode standard QR codes, barcodes, and URLs.
-- **QR Code Generator**: Create custom QR codes for Text, URLs, Wi-Fi, Locations, Contacts (vCard), Email, Phone, SMS, and extended contact cards.
-- **Download & Share**: Save generated QR codes directly to your device's Downloads folder for easy sharing.
-- **Modern UI/UX**: Clean, minimalist design using Jetpack Compose with beautiful dynamic Light and Dark mode themes.
-- **Smart Actions**: 
-  - Open Android's confirmation flow for supported Wi-Fi networks, or guide the user to Wi-Fi settings when manual setup is required.
-  - Open URLs directly in the browser.
-  - Smart copy-to-clipboard functionality.
-- **Upload from Gallery**: Scan QR codes from images saved on your device.
-- **Torch Control**: Easily toggle the camera flashlight for scanning in low-light environments.
-- **History Management**: Optionally save non-sensitive scans and generated codes. Consecutive duplicates are skipped, and sensitive Wi-Fi, contact, email, phone, and SMS payloads are excluded.
-- **No Ads, No Trackers**: 100% privacy-focused.
-- **Fully Offline**: Does not require an internet connection to scan and decode.
-- **Friendly First Run**: A concise welcome tour explains scanning, creation, and the app's privacy model.
-- **Accessible Motion**: Scanner animation can be disabled while keeping the full scanning experience.
+**Current app version:** `1.2.0` · **Minimum Android version:** Android 7.0 (API 24) · **Target SDK:** 36
 
-## 📸 Screenshots
+## New in 1.2.0
 
-These are current, automated captures from the real app running on the API 29 CI emulator. The
-scanner preview uses the emulator's synthetic camera feed; a physical device shows the live camera.
+- **Design studio:** debounced live preview, square or rounded modules, center logos, and QR-only, Wi-Fi, business, invitation, and printable-sign layouts. Save PNGs with the document picker or share them. Every studio image is decoded and compared with the original content before export is enabled. High error correction is used; overly dense designs may need shorter content.
+- **Shared images:** choose Scan image from another app’s Android share sheet. Multiple detected results have separate copy and open controls, with the same history privacy policy.
+- **Camera controls:** pinch to zoom and touch focus regions on supported cameras. Multiple-code mode searches each camera frame for several codes and collects distinct results for selection; gallery images are also searched for multiple codes at once.
+- **Collections:** name saved entries and assign a folder, filter folders, and search names/folders as well as content. Database migration preserves existing history.
+- **Home screen:** long-press the app icon for Scan/Create shortcuts. Use Add widget on a non-sensitive History entry to pin its QR (supported launchers on Android 8+). Widgets keep a snapshot until removed, even if the history entry is deleted; use only content you want visible on the home screen.
+
+## Features
+
+### Scan and act on results
+
+- Scan QR codes and supported barcodes with the live camera, or choose an image from the system picker with **Gallery**.
+- Toggle the flashlight and switch cameras when the device has multiple cameras. Gallery scanning also works without camera permission.
+- Review the decoded content, payload type, and barcode format before choosing an action. Copy or share the result as text, then select **Scan another** to resume.
+- Open HTTP/HTTPS links, view coordinates in a maps app, create a contact, compose an email or SMS, or open the phone dialer for recognized payloads.
+- Add supported Wi-Fi networks through Android's confirmation screen on Android 11 and newer. WEP networks and Android 10 or earlier use Wi-Fi settings for manual setup. The parser also recognizes hidden-network data.
+- Control scan sound and haptic feedback independently. Scan sound respects silent and vibrate modes.
+
+### Create QR codes
+
+The **Create** screen offers ten modes:
+
+| Mode | Contents |
+| --- | --- |
+| Smart | Detect links, email addresses, and structured Wi-Fi, location, vCard, phone, email, or SMS data; otherwise use text. |
+| Text | Plain text, including multiline and Unicode content. |
+| URL | A web address; addresses without a scheme are normalized to HTTPS. |
+| Wi-Fi | Network name, password, and WPA2, WPA3, WEP, or open-network security. |
+| Location | Latitude and longitude. |
+| Contact | A vCard with a name, phone number, and email address. |
+| Email | Recipients, an optional subject, and an optional message. |
+| Phone | A phone number that opens the dialer when scanned. |
+| SMS | A phone number and an optional message. |
+| Contact card | An extended vCard with a website and notes; Wi-Fi details and location text are included in its notes field. |
+
+- Choose from **seven foreground** and **six background** color presets.
+- Inline validation checks the fields for the selected mode. The **QR readiness** card shows input status, encoded byte count, and a reliability rating.
+- Generation requires a darker foreground than background and a contrast ratio of at least **4.5:1**. Payloads above **2,400 UTF-8 bytes** are rejected; error correction adjusts to payload size.
+- Preview the generated **512 × 512 PNG**, then **Save** it or **Share** it through Android's share sheet.
+- Android 10 and newer save directly to **Downloads**. Android 7–9 use the system document picker to choose a destination.
+- Form values, color choices, and the last generated result use saved state to survive activity recreation.
+
+### Manage local history
+
+- **Save to history** is enabled by default and can be turned off in Settings.
+- Search saved content and filter by **All**, **Scanned**, **Generated**, or **Pinned**.
+- Pin entries to keep them at the top, with newer entries first within each group.
+- Each card shows its source, payload type, timestamp, content preview, and an action when supported. Tap a card to copy its contents.
+- Delete an individual entry or clear the entire history, with confirmation before deletion.
+- Consecutive duplicates with the same content, barcode format, and source are skipped.
+- Recognized Wi-Fi, contact/vCard, email, phone, and SMS payloads are excluded from history, even when saving is enabled.
+
+## Current interface
+
+The app uses Jetpack Compose and Material 3, with rounded cards, large screen headings, blue accents, and mint selection and privacy indicators. Light mode uses pale backgrounds; dark mode uses navy and slate surfaces. **Light**, **Dark**, and **System default** are available in Settings, with System default selected initially.
+
+| Screen | What you see |
+| --- | --- |
+| Scan | A live camera preview, framed scanning area, alignment hint, on-device privacy badge, and gallery/flashlight controls. Camera switching appears when multiple cameras are available. Results pause scanning for review. |
+| Create | A heading and privacy badge, horizontally scrolling format chips, fields for the selected format, color swatches, a readiness card, and generation/preview/save/share controls below. Smart is the initial mode. |
+| History | A saved-item count, search field, filter chips, and cards with type badges, timestamps, pin and delete controls. Empty and no-match states explain what to do next. |
+| Settings | A privacy overview and grouped cards for appearance, scanner feedback, accessibility, history saving, and app/developer information. |
+
+Phones use a bottom navigation bar with **Scan**, **Create**, **History**, and **Settings**. At widths of **700 dp or more**, navigation moves to a side rail. Forms scroll, and action rows adapt to narrow layouts. **Reduce motion** keeps the scanner frame still. A three-page welcome tour introduces scanning, creation, and privacy; it can be skipped or replayed from Settings.
+
+## Screenshots
+
+The checked-in gallery shows version 1.1.0 captured on an API 29 emulator; it does not yet show the new 1.2.0 studio, collections, or multiple-code controls. The scanner's colored background is the emulator's synthetic camera feed; a physical device shows its live camera. The Create screenshots show Text mode selected, and the History screenshots use sample content.
 
 ### Welcome
 
@@ -42,87 +92,94 @@ scanner preview uses the emulator's synthetic camera feed; a physical device sho
 | :---: | :---: | :---: | :---: |
 | <img src="screenshots/07-scanner-dark.png" width="200" alt="Scanner in dark theme"> | <img src="screenshots/08-create-dark.png" width="200" alt="QR creator in dark theme"> | <img src="screenshots/09-history-dark.png" width="200" alt="Local history in dark theme"> | <img src="screenshots/06-settings-dark.png" width="200" alt="Settings in dark theme"> |
 
-## 💻 Tech Stack
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose & Material Design 3
-- **Database**: Room (SQLite) & Jetpack DataStore (Preferences)
-- **Architecture**: MVVM, Compose Navigation
-- **QR Core Engine**: ZXing (Zebra Crossing)
+## Privacy and permissions
 
-## 🛠️ How to Build from Source
-Anyone can clone and build this application locally using Android Studio.
+Scanning, image decoding, QR generation, history, and preferences are handled locally. The app has no ads, trackers, or account requirements, and its manifest requests no internet permission. Opening links or handing content to another app uses that app's services.
+
+| Permission | Purpose |
+| --- | --- |
+| `android.permission.CAMERA` | Live camera scanning; requested at runtime. |
+| `android.permission.VIBRATE` | Optional haptic feedback after a successful scan. |
+
+No broad storage permission is required. Gallery images are decoded locally without being copied into app storage. App backup is disabled, and history/preferences are excluded from cloud backup and device transfer. History filtering excludes recognized sensitive payload types; plain text and URLs can still contain information you may prefer not to save.
+
+See the [privacy policy](PRIVACY_POLICY.md) and [security reporting instructions](SECURITY.md).
+
+## Tech stack
+
+| Area | Implementation |
+| --- | --- |
+| Language and UI | Kotlin 2.2.21, Jetpack Compose, Material 3 |
+| Navigation and state | Navigation Compose, ViewModel, Kotlin coroutines and Flow |
+| Scanning and generation | ZXing core 3.5.3 and ZXing Android Embedded 4.3.0 |
+| Local storage | Room 2.8.5 for history; Preferences DataStore for settings |
+| Build tools | Android Gradle Plugin 8.10.1, Gradle wrapper 8.11.1, JDK 17 |
+| Android support | Minimum API 24; compile and target API 36 |
+
+## Build from source
 
 ### Prerequisites
-- **Android Studio** with Android Gradle Plugin 8.10 support
-- **JDK 17** (the version used by CI and required for reproducible builds)
-- **Android SDK Platform 36** and the latest available SDK Build Tools
 
-### Build Instructions
-1. **Clone the repository**:
+- Android Studio with Android Gradle Plugin 8.10 support.
+- JDK 17, matching CI and the project's Java/Kotlin target.
+- Android SDK Platform 36 and the build tools requested by Gradle.
+
+### Setup and installation
+
+1. Clone the repository:
+
    ```bash
    git clone https://github.com/Aaravkhanal/qr-app.git
    cd qr-app
    ```
-2. **Open the project**:
-   Open Android Studio -> `File` -> `Open...` and select the project directory.
-3. **Configure the Android SDK**:
-   Install Android SDK Platform 36 through Android Studio's SDK Manager. Android Studio normally creates a local, untracked `local.properties` file containing your SDK path. For command-line builds, either create that file locally or set `ANDROID_HOME`; never commit machine-specific SDK paths.
-4. **Use JDK 17**:
-   Select JDK 17 as the Gradle JDK in Android Studio. For command-line builds, make sure `JAVA_HOME` points to a JDK 17 installation.
-5. **Sync Gradle**:
-   Allow Android Studio to download dependencies and sync the Gradle files.
-6. **Build and verify**:
-   ```bash
-   ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 
-   # Produces an unsigned bundle unless release signing is configured below.
-   ./gradlew bundleRelease
-   ```
-7. **Install on Device**:
+2. Open the project folder in Android Studio and install SDK Platform 36 through SDK Manager.
+3. Select JDK 17 as the Gradle JDK. For command-line builds, point `JAVA_HOME` to JDK 17.
+4. Configure the SDK path through Android Studio's untracked `local.properties` file or set `ANDROID_HOME`. Keep machine-specific paths out of version control.
+5. Sync Gradle, then build and install on a connected device or emulator:
+
    ```bash
+   ./gradlew assembleDebug
    ./gradlew installDebug
    ```
 
-Code formatting follows the repository `.editorconfig`. Android Lint is configured in
-`app/lint.xml`; run `./gradlew lintDebug` before submitting changes. CI runs unit tests, lint, and
-debug and unsigned-release builds for every change to `master`.
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat` in place of `./gradlew`.
 
-### Automated Tests
+### Checks and automated tests
 
-Run the fast local checks with:
+Run formatting, unit tests, lint, and builds with:
 
 ```bash
 bash scripts/check-formatting.sh
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease
 ```
 
-Instrumentation tests cover Room migrations and CRUD behavior, settings persistence, permission
-states, generator validation and restoration, history management, theme selection, and smart-action
-intent dispatch. Run them on a connected device or emulator with:
+Unit tests cover payload parsing/encoding and validation, QR reliability rules, history privacy, scan-session gating, and gallery/camera policies. Instrumentation tests cover Room migrations and CRUD, settings persistence, permission states, generator validation and restoration, history controls, theme selection, onboarding, and action-intent dispatch. UI coverage includes a 280 dp layout at 200% font scale.
+
+Run the instrumentation suite on a connected device or emulator, excluding the separate screenshot capture test:
 
 ```bash
-./gradlew connectedDebugAndroidTest
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.ritikqrscanner.app.ui.AppScreenshotTest
 ```
 
-The main CI workflow runs instrumentation tests on API 29. The manually triggered **Android Device
-Matrix** workflow runs the same suite on APIs 24, 28, 29, 30, 33, and 36 with no front camera. The
-emulator also provides the no-hardware-flash path. Compose tests exercise a 280 dp layout at 200%
-font scale, and payload tests include long, escaped, multiline, Unicode, and international values.
-The **Current App Screenshots** workflow launches the app on API 29 and exports the README gallery,
-so documentation images can be regenerated from the current UI instead of edited by hand.
+[Android CI](.github/workflows/android.yml) runs formatting, unit tests, lint, debug/unsigned-release builds, Room schema checks, and API 29 instrumentation for pushes and pull requests to `master`. The manually triggered [Android Device Matrix](.github/workflows/device-matrix.yml) runs instrumentation on APIs **24, 28, 29, 30, 33, and 36**.
 
-## Release readiness
+### Refresh the screenshot gallery
 
-Before publishing, run the manual Android Device Matrix workflow and verify one physical device in
-bright light and low light. Check camera permission denial/recovery, torch availability, camera
-switching, gallery scanning, large-font layouts, dark/light themes, save/share destinations, and a
-signed bundle install. Store screenshots must use synthetic QR contents and must not show personal
-history. Dependency updates are monitored through Dependabot; suspected vulnerabilities should be
-reported using the private process in `SECURITY.md`.
+Run the manually triggered [Current App Screenshots](.github/workflows/screenshots.yml) workflow. It runs `AppScreenshotTest` on an API 29 emulator and uploads the nine captures as the `current-app-screenshots` artifact. Download those images and replace the matching files in `screenshots/` to update this README's gallery.
 
-### Release Signing
+To capture on a local device or emulator:
 
-Local release builds are unsigned by default, so a fresh clone can run `assembleRelease` without private signing material. To create a signed release, add an untracked `keystore.properties` file in the project root:
+```bash
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.ritikqrscanner.app.ui.AppScreenshotTest
+adb pull /sdcard/Download/app-screenshots/. screenshots/
+```
+
+The screenshot test changes theme/onboarding settings and adds sample history. Use a test device or emulator with synthetic data.
+
+### Release signing
+
+Release APKs and bundles are unsigned by default. To sign them, add an untracked `keystore.properties` file in the project root:
 
 ```properties
 storeFile=/absolute/path/to/release.keystore
@@ -131,39 +188,22 @@ keyAlias=your-key-alias
 keyPassword=your-key-password
 ```
 
-The keystore and `keystore.properties` are ignored by Git. Keep both files outside version control and provide them to CI through encrypted secrets when publishing.
+Then run:
 
-### Scan Feedback Policy
+```bash
+./gradlew assembleRelease bundleRelease
+```
 
-Scan sound and vibration are each controlled by their setting. Sound uses the notification audio
-stream and only plays while the device ringer is in normal mode; silent and vibrate modes are never
-overridden. The audio resource is released when the scanner leaves the screen.
+The keystore and `keystore.properties` are ignored by Git. Supply signing material through encrypted secrets when publishing from CI.
 
-## 🐛 Bug Fixes & Improvements
-- **Wi-Fi Setup**: Parses open, WPA2, WPA3, WEP, and hidden networks. Android 11+ uses the system-confirmed add-network screen; WEP and older Android versions are routed to Wi-Fi settings for manual setup.
-- **Dark Mode Theming**: Resolved hardcoded colors that broke UI visibility in dark mode. Complete migration to Material Theme ColorSchemes.
-- **Manifest Routing**: Fixed `ClassNotFoundException` on app startup caused by namespace refactoring mismatches.
-- **UI Enhancements**: Restructured the scanner screen overlay with explicit icons (Torch, Gallery, Switch Camera) matching the modern aesthetic.
+Before publishing, run the device matrix and check a physical device in bright and low light: camera permission recovery, flashlight and camera switching, gallery scanning, large fonts, both themes, save/share destinations, and installation of the signed build. Use synthetic content in store screenshots.
 
-## 🔐 App Permissions
-To provide its functionality, the app requires the following permissions:
-- `android.permission.CAMERA`: Required to scan QR codes and barcodes.
-- `android.permission.VIBRATE`: Provides haptic feedback upon successful scan.
+## Developer
 
-Generated QR codes are saved through MediaStore on Android 10 and newer. Android 7–9 uses the
-system document picker, so the app does not need broad storage access on any supported version.
+- **Developer:** Aarav Khanal
+- **Contact:** [khanalaarav2063@gmail.com](mailto:khanalaarav2063@gmail.com)
+- **GitHub:** [Aaravkhanal](https://github.com/Aaravkhanal)
 
-App backup is disabled. History and preferences remain local and are not intentionally included in
-cloud backup. The optional history setting stores only non-sensitive payloads; Wi-Fi credentials,
-contacts, email, telephone, and SMS payloads are always excluded. Gallery images are decoded locally
-and are not copied into app storage.
+## License
 
-## 👨‍💻 Developer Details
-- **Developer**: Aarav Khanal
-- **Contact**: [khanalaarav2063@gmail.com](mailto:khanalaarav2063@gmail.com)
-- **GitHub**: [Aaravkhanal](https://github.com/Aaravkhanal)
-- **Website**: [github.com/Aaravkhanal](https://github.com/Aaravkhanal/)
-- **Privacy Policy**: [Read Here](https://github.com/Aaravkhanal/qr-app/blob/master/PRIVACY_POLICY.md)
-
-## 📄 License
-© 2026 Aarav Khanal. All rights reserved.
+Distributed under the [MIT License](LICENSE). See the license file for its copyright notice and terms.

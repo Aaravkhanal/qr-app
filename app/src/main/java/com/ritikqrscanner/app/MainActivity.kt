@@ -101,6 +101,10 @@ private val appDestinations = listOf(
 @Composable
 fun ModernQRApp() {
     val navController = rememberNavController()
+    val launchActivity = LocalContext.current as? android.app.Activity
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (launchActivity?.intent?.data?.host == "create") navController.navigate("generator")
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

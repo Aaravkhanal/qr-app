@@ -17,7 +17,9 @@ import kotlinx.coroutines.withContext
 
 private const val MAX_IMAGE_DIMENSION = 1600
 
-suspend fun decodeGalleryBarcode(context: Context, uri: Uri): Result = withContext(Dispatchers.IO) {
+suspend fun decodeGalleryBarcode(context: Context, uri: Uri): Result = decodeGalleryBarcodes(context, uri).first()
+
+suspend fun decodeGalleryBarcodes(context: Context, uri: Uri): List<Result> = withContext(Dispatchers.IO) {
     try {
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -53,14 +55,14 @@ internal fun calculateGallerySampleSize(width: Int, height: Int): Int {
     return sampleSize
 }
 
-private fun decodeWithRotations(bitmap: Bitmap, notFoundMessage: String): Result {
+private fun decodeWithRotations(bitmap: Bitmap, notFoundMessage: String): List<Result> {
     val pixels = IntArray(bitmap.width * bitmap.height)
     bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
     var source: LuminanceSource = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
 
     repeat(4) { attempt ->
         try {
-            return MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(source)))
+            return com.google.zxing.multi.GenericMultipleBarcodeReader(MultiFormatReader()).decodeMultiple(BinaryBitmap(HybridBinarizer(source)), mapOf(com.google.zxing.DecodeHintType.TRY_HARDER to true)).distinctBy { it.text }
         } catch (_: NotFoundException) {
             if (attempt < 3 && source.isRotateSupported) source = source.rotateCounterClockwise()
         }

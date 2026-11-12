@@ -69,6 +69,23 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun migration2To3PreservesEntriesAndAddsEmptyMetadata() {
+        helper.createDatabase("collections-migration-test", 2).apply {
+            execSQL("INSERT INTO history_table (id, content, format, type, timestamp, isPinned) VALUES (1, 'keep me', 'QR_CODE', 'Scanned', 42, 1)")
+            close()
+        }
+        helper.runMigrationsAndValidate("collections-migration-test", 3, true, AppDatabase.MIGRATION_2_3).use { db ->
+            db.query("SELECT content, isPinned, name, collection FROM history_table WHERE id = 1").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals("keep me", cursor.getString(0))
+                assertEquals(1, cursor.getInt(1))
+                assertEquals("", cursor.getString(2))
+                assertEquals("", cursor.getString(3))
+            }
+        }
+    }
+
     private companion object {
         const val TEST_DATABASE = "history-migration-test"
         const val TEST_DATABASE_WITH_PIN = "history-migration-test-with-pin"

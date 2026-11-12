@@ -256,4 +256,5 @@
     <string name="validation_payload_too_large">This content is too large for a reliable QR code. Shorten it and try again.</string>
     <string name="validation_foreground_too_light">Use a darker foreground than background for reliable scanning.</string>
     <string name="validation_low_contrast">These colors have low contrast. Choose a darker foreground or lighter background.</string>
+    <string name="widget_saved_qr">Saved QR code</string>
 </resources>

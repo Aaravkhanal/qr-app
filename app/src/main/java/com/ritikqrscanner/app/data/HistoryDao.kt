@@ -8,7 +8,7 @@ interface HistoryDao {
     @Query(
         """
         SELECT * FROM history_table
-        WHERE (:escapedQuery = '' OR content LIKE '%' || :escapedQuery || '%' ESCAPE '\')
+        WHERE (:escapedQuery = '' OR (content LIKE '%' || :escapedQuery || '%' ESCAPE '\' OR name LIKE '%' || :escapedQuery || '%' ESCAPE '\' OR collection LIKE '%' || :escapedQuery || '%' ESCAPE '\'))
           AND (:entryType IS NULL OR type = :entryType)
           AND (:pinnedOnly = 0 OR isPinned = 1)
         ORDER BY isPinned DESC, timestamp DESC

@@ -104,6 +104,10 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
     }
     var galleryError by rememberSaveable { mutableStateOf<String?>(null) }
     var isGalleryDecoding by remember { mutableStateOf(false) }
+    var multipleMode by rememberSaveable { mutableStateOf(false) }
+    var choices by remember { mutableStateOf<List<com.google.zxing.Result>>(emptyList()) }
+
+
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -132,12 +136,31 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
 
     fun armCamera() {
         val view = barcodeView ?: return
-        if (!hasCameraPermission || !lifecycleResumed || scannedResult != null || isGalleryDecoding || selectedCameraId < 0) return
+        if ((!multipleMode && choices.isNotEmpty()) || !hasCameraPermission || !lifecycleResumed || scannedResult != null || isGalleryDecoding || selectedCameraId < 0) return
         try {
             view.pause()
             view.cameraSettings = CameraSettings().apply { requestedCameraId = selectedCameraId }
+            view.barcodeView.decoderFactory = if (multipleMode) {
+                com.journeyapps.barcodescanner.DecoderFactory { hints ->
+                    object : com.journeyapps.barcodescanner.Decoder(com.google.zxing.MultiFormatReader()) {
+                        override fun decode(source: com.google.zxing.LuminanceSource): com.google.zxing.Result? {
+                            return try {
+                                val results = com.google.zxing.multi.GenericMultipleBarcodeReader(com.google.zxing.MultiFormatReader()).decodeMultiple(
+                                    com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(source)), hints
+                                ).toList()
+                                view.post { if (multipleMode && scannedResult == null) choices = (choices + results).distinctBy { it.text }.take(20) }
+                                results.firstOrNull()
+                            } catch (_: Exception) { null }
+                        }
+                    }
+                }
+            } else com.journeyapps.barcodescanner.DefaultDecoderFactory()
             view.resume()
-            view.decodeSingle { result -> acceptResult(result.text, result.barcodeFormat.name) }
+            if (multipleMode) view.decodeContinuous(object : com.journeyapps.barcodescanner.BarcodeCallback {
+                override fun barcodeResult(result: com.journeyapps.barcodescanner.BarcodeResult) {
+                    if (choices.size < 20 && choices.none { it.text == result.text }) choices = choices + com.google.zxing.Result(result.text, null, null, result.barcodeFormat)
+                }
+            }) else view.decodeSingle { result -> acceptResult(result.text, result.barcodeFormat.name) }
         } catch (error: RuntimeException) {
             logScannerFailure("Unable to start camera", error)
             cameraError = context.getString(R.string.camera_start_error)
@@ -151,8 +174,8 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
         }
         scope.launch {
             try {
-                val result = decodeGalleryBarcode(context, uri)
-                acceptResult(result.text, result.barcodeFormat.name)
+                val results = com.ritikqrscanner.app.scanner.decodeGalleryBarcodes(context, uri)
+                if (results.size == 1) acceptResult(results.first().text, results.first().barcodeFormat.name) else choices = results
             } catch (error: CancellationException) {
                 throw error
             } catch (error: GalleryDecodeException) {
@@ -196,9 +219,9 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
         scannedResult,
         isGalleryDecoding,
         selectedCameraId,
-        cameraRetryKey
+        cameraRetryKey, multipleMode, (multipleMode || choices.isEmpty())
     ) {
-        if (scannedResult == null && !isGalleryDecoding) armCamera() else barcodeView?.pause()
+        if (scannedResult == null && !isGalleryDecoding && (multipleMode || choices.isEmpty())) armCamera() else barcodeView?.pause()
     }
 
     DisposableEffect(Unit) {
@@ -227,6 +250,19 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
+            androidx.compose.material3.TextButton(onClick = { multipleMode = !multipleMode; choices = emptyList() }) {
+                Text(if (multipleMode) "Multiple codes: collecting • tap a result below" else "Find multiple codes")
+            }
+            Text("Pinch to zoom • tap to focus (when supported)", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
+            if (choices.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow {
+                    items(choices.size) { index ->
+                        val result = choices[index]
+                        androidx.compose.material3.TextButton(onClick = { choices = emptyList(); acceptResult(result.text, result.barcodeFormat.name) }) { Text(result.text.take(32)) }
+                    }
+                }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -255,6 +291,7 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
                                     }
                                     override fun cameraClosed() = Unit
                                 })
+                                com.ritikqrscanner.app.scanner.installCameraGestures(this)
                                 barcodeView = this
                             }
                         },
@@ -375,11 +412,21 @@ fun ScannerScreen(viewModel: MainViewModel = viewModel()) {
             }
         }
     } else {
-        CameraPermissionContent(
-            permanentlyDenied = permissionPermanentlyDenied,
-            onTryAgain = ::requestCameraPermission,
-            onOpenSettings = { context.openAppSettings() }
-        )
+        Column(Modifier.fillMaxSize()) {
+            androidx.compose.material3.TextButton(onClick = { galleryLauncher.launch("image/*") }) { Text("Scan an image from Gallery") }
+            galleryError?.let { Text(it, modifier = Modifier.padding(16.dp)) }
+            choices.forEach { result ->
+                androidx.compose.material3.TextButton(onClick = { choices = emptyList(); acceptResult(result.text, result.barcodeFormat.name) }) { Text(result.text.take(48)) }
+            }
+            if (scannedResult != null) ScannedResultCard(scannedResult!!, scannedFormat) { sessionGate.dismiss(); scannedResult = null }
+            else Box(Modifier.weight(1f)) {
+                CameraPermissionContent(
+                    permanentlyDenied = permissionPermanentlyDenied,
+                    onTryAgain = ::requestCameraPermission,
+                    onOpenSettings = { context.openAppSettings() }
+                )
+            }
+        }
     }
 }
 
